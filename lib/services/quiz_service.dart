@@ -58,8 +58,8 @@ class QuizService {
             });
             
             // Also handle backward compatibility for direct quizzes (not in units)
-            if (unitValue.containsKey('title') && !unitValue.containsKey('questions')) {
-              // This is a direct quiz, not a unit
+            if (unitValue.containsKey('title') && unitValue.containsKey('questions')) {
+              // This is a direct quiz, not a unit (old format)
               print('QuizService: Found direct quiz "${unitValue['title']}"');
               quizzes.add({
                 'id': unitKey,

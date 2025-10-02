@@ -22,36 +22,29 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
   Future<void> _deleteQuiz(String key, String? unitName) async {
     try {
       bool deleted = false;
-      print('Debug: Attempting to delete quiz with key="$key", unitName="$unitName"');
       
       if (unitName != null) {
         // Try to delete from specific unit first (new structure)
         final unitRef = _quizRef.child(unitName.replaceAll(' ', '_'));
         final unitSnapshot = await unitRef.child(key).get();
-        print('Debug: Checking unit path: ${unitRef.child(key).path}, exists: ${unitSnapshot.exists}');
         if (unitSnapshot.exists) {
           await unitRef.child(key).remove();
-          print('Debug: Successfully deleted from unit structure');
           deleted = true;
         }
       }
       
       if (!deleted) {
-        print('Debug: Unit deletion failed, trying fallback search');
         // Fallback: search through all possible locations
         final snapshot = await _quizRef.get();
         if (snapshot.exists) {
           final data = snapshot.value as Map<dynamic, dynamic>;
-          print('Debug: Firebase root keys: ${data.keys.toList()}');
           
           // First, try to find in unit-based structure
           for (var unitKey in data.keys) {
             if (data[unitKey] is Map) {
               final unitData = data[unitKey] as Map<dynamic, dynamic>;
-              print('Debug: Checking unit "$unitKey" with keys: ${unitData.keys.toList()}');
               if (unitData.containsKey(key)) {
                 await _quizRef.child(unitKey).child(key).remove();
-                print('Debug: Successfully deleted from unit "$unitKey"');
                 deleted = true;
                 break;
               }
@@ -60,7 +53,6 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
           
           // If still not found, try direct quiz structure (old format)
           if (!deleted && data.containsKey(key)) {
-            print('Debug: Found quiz in direct structure, deleting');
             await _quizRef.child(key).remove();
             deleted = true;
           }
@@ -107,7 +99,58 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     final subjectKey = widget.subject['label'].toString().replaceAll(' ', '_');
     _quizRef = FirebaseDatabase.instance.ref().child('quizzes').child(subjectKey);
+    await _migrateOldQuizzes(); // Migrate old quizzes to new structure
     _loadQuizzes();
+  }
+
+  Future<void> _migrateOldQuizzes() async {
+    try {
+      final snapshot = await _quizRef.get();
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        bool migrationNeeded = false;
+        Map<String, dynamic> quizzesToMigrate = {};
+        
+        // Find old-style direct quizzes that need migration
+        data.forEach((key, value) {
+          if (value is Map && value.containsKey('title') && value.containsKey('questions')) {
+            // This is a direct quiz (old format)
+            String unitName = value['unit']?.toString() ?? 'Unit 1';
+            quizzesToMigrate[key.toString()] = {
+              'quiz': value,
+              'unit': unitName,
+            };
+            migrationNeeded = true;
+            print('Found old quiz to migrate: ${value['title']} -> $unitName');
+          }
+        });
+        
+        if (migrationNeeded) {
+          print('Migrating ${quizzesToMigrate.length} old quizzes to new unit structure...');
+          
+          // Migrate each quiz to the proper unit structure
+          for (var entry in quizzesToMigrate.entries) {
+            String oldKey = entry.key;
+            Map<dynamic, dynamic> quizData = entry.value['quiz'];
+            String unitName = entry.value['unit'];
+            
+            // Create new quiz in unit structure
+            final unitRef = _quizRef.child(unitName.replaceAll(' ', '_'));
+            final newRef = unitRef.push();
+            await newRef.set(quizData);
+            
+            // Remove old direct quiz
+            await _quizRef.child(oldKey).remove();
+            
+            print('Migrated quiz "${quizData['title']}" to unit "$unitName"');
+          }
+          
+          print('Migration completed successfully!');
+        }
+      }
+    } catch (e) {
+      print('Error during quiz migration: $e');
+    }
   }
 
   Future<void> _loadQuizzes() async {
@@ -525,8 +568,6 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                             ),
                                           );
                                           if (confirm == true) {
-                                            print('Debug: Deleting quiz with key="${quiz['key']}", unit="${quiz['unit']}"');
-                                            print('Debug: Quiz data = $quiz');
                                             await _deleteQuiz(quiz['key'], quiz['unit']);
                                           }
                                         },

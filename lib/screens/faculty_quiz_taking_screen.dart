@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
 import 'dart:async';
+import 'quiz_results_screen.dart';
 
 class FacultyQuizTakingScreen extends StatefulWidget {
   final Map<String, dynamic> quiz;
@@ -22,7 +23,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
   List<Map<String, dynamic>> questions = [];
   Timer? _timer;
   int timeRemaining = 0; // in seconds
+  int totalTimeAllocated = 0; // in seconds
   bool quizCompleted = false;
+  DateTime? quizStartTime;
 
   @override
   void initState() {
@@ -37,6 +40,10 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     String duration = widget.quiz['duration'] ?? '15 min';
     int minutes = int.tryParse(duration.split(' ')[0]) ?? 15;
     timeRemaining = minutes * 60;
+    totalTimeAllocated = minutes * 60;
+    
+    // Record start time
+    quizStartTime = DateTime.now();
     
     _startTimer();
   }
@@ -93,8 +100,13 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
 
   void _showResults() {
     int correctAnswers = 0;
+    List<int?> userAnswers = [];
+    
+    // Calculate results and prepare user answers array
     for (int i = 0; i < questions.length; i++) {
       int? selectedAnswer = selectedAnswers[i];
+      userAnswers.add(selectedAnswer);
+      
       int correctAnswer = questions[i]['correct'] ?? 0;
       if (selectedAnswer == correctAnswer) {
         correctAnswers++;
@@ -102,56 +114,25 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     }
 
     double percentage = (correctAnswers / questions.length) * 100;
+    
+    // Calculate time taken
+    Duration timeTaken = quizStartTime != null 
+        ? DateTime.now().difference(quizStartTime!)
+        : Duration(seconds: totalTimeAllocated - timeRemaining);
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Quiz Completed!',
-          style: TextStyle(
-            color: widget.subject['color'],
-            fontWeight: FontWeight.bold,
-          ),
+    // Navigate to detailed results screen
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizResultsScreen(
+          quiz: widget.quiz,
+          subject: widget.subject,
+          questions: questions,
+          userAnswers: userAnswers,
+          correctAnswers: correctAnswers,
+          percentage: percentage,
+          timeTaken: timeTaken,
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              percentage >= 70 ? Icons.celebration : Icons.info_outline,
-              size: 60,
-              color: percentage >= 70 ? Colors.green : Colors.orange,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Score: $correctAnswers/${questions.length}',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              '${percentage.toStringAsFixed(1)}%',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: percentage >= 70 ? Colors.green : Colors.orange,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              percentage >= 70 ? 'Great job!' : 'Keep practicing!',
-              style: TextStyle(color: primaryBar.withOpacity(0.7)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to subject detail
-            },
-            child: Text('Back to Subject'),
-          ),
-        ],
       ),
     );
   }
