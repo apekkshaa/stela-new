@@ -56,7 +56,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     {
       "title": "Quizzes",
       "icon": Icons.quiz,
-      "route": Quizzes(),
+      "route": QuizzesScreen(),
       "desc": "Test your knowledge"
     },
     {

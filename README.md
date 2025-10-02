@@ -1,4 +1,4 @@
-# stela_app
+# stela_7.0
 
 A new Flutter project.
 

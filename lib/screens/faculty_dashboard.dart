@@ -10,7 +10,10 @@ import 'package:stela_app/screens/faculty_assignment_manage.dart';
 import 'package:stela_app/screens/faculty_submissions_manage.dart';
 import 'package:stela_app/screens/faculty_announcements_manage.dart';
 import 'package:stela_app/screens/faculty_progress_manage.dart';
+<<<<<<< HEAD
 import 'package:stela_app/screens/subjects.dart';
+=======
+>>>>>>> 79abe9da75591e73f288dc6ecbf93143478746dd
 
 // Import your upload, assignment, quiz, etc. pages here
 

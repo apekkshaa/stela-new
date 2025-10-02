@@ -3,24 +3,17 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:stela_app/constants/colors.dart';
-import 'package:stela_app/constants/userDetails.dart';
 import 'package:stela_app/screens/profile.dart';
 import 'package:stela_app/screens/login.dart';
 import 'package:stela_app/screens/MyFiles.dart';
 import 'package:stela_app/screens/PythonTutorial.dart';
 import 'package:stela_app/screens/CCTutorial.dart';
-import 'package:stela_app/screens/CCassessmentPage.dart';
-import 'package:stela_app/screens/AIPTassessmentPage.dart';
-import 'package:stela_app/screens/COAassessmentPage.dart';
-import 'package:stela_app/screens/assessmentPage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stela_app/screens/COATutorial.dart';
 import 'package:stela_app/screens/student_dashboard.dart';
 import 'package:stela_app/screens/machine_learning_page.dart';
 import 'package:stela_app/screens/wireless_networks_page.dart';
 import 'package:stela_app/screens/compiler_design_page.dart';
 import 'package:stela_app/screens/computer_networks_page.dart';
-import 'package:stela_app/screens/TakeQuizPage.dart';
 String usermanual1 =
     "https://docs.google.com/document/d/1-55-CJP_Be6KlZgdGFk6K_j7sFQeqGulqfCrZPD2bcA/edit?usp=sharing";
 String feedback =
@@ -32,49 +25,6 @@ class Subjects extends StatefulWidget {
 }
 
 class _SubjectsState extends State<Subjects> {
-  // Delete quiz from Firestore
-  Future<void> deleteQuiz(String subjectLabel, String quizId) async {
-    try {
-      await firestore.collection('quizzes').doc(subjectLabel).collection('items').doc(quizId).delete();
-      await fetchQuizzes();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz deleted!')));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete quiz: $e')));
-    }
-  }
-  // Firestore reference for quizzes
-  final FirebaseFirestore firestore = FirebaseFirestore.instance;
-
-  // Store quizzes fetched for each subject
-  Map<String, List<Map<String, dynamic>>> subjectQuizzes = {};
-
-  // Fetch quizzes for all subjects
-  Future<void> fetchQuizzes() async {
-    print('\n=== Fetching quizzes for subjects page ===');
-    for (var subject in subjects) {
-      String label = subject['label'];
-      print('Fetching quizzes for subject: $label');
-      var snapshot = await firestore.collection('quizzes').doc(label).collection('items').get();
-      var quizList = snapshot.docs.map((doc) {
-        var data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-      subjectQuizzes[label] = quizList;
-      print('Found ${quizList.length} quizzes for $label');
-      if (quizList.isNotEmpty) {
-        print('Quiz titles: ${quizList.map((q) => q['title']).toList()}');
-      }
-    }
-    print('Total subjects with quizzes: ${subjectQuizzes.values.where((list) => list.isNotEmpty).length}');
-    setState(() {});
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    fetchQuizzes();
-  }
   final List<Map<String, dynamic>> subjects = [
     {
       "label": "Artificial Intelligence - Programming Tools",
@@ -559,8 +509,6 @@ class _SubjectsState extends State<Subjects> {
   }
 
   Widget _buildSubjectCard(BuildContext context, Map<String, dynamic> item) {
-  // Use global enrollmentNo from userDetails.dart
-  bool isFaculty = userRole == "FACULTY" || userRole == "Faculty";
     return InkWell(
       onTap: () async {
         if (item.containsKey('widget')) {
@@ -719,208 +667,6 @@ class _SubjectsState extends State<Subjects> {
                         ],
                       ),
                     ),
-                    // Show quizzes for this subject
-                    if (subjectQuizzes[item['label']] != null && subjectQuizzes[item['label']]!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Available Quizzes:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ...subjectQuizzes[item['label']]!.asMap().entries.map((entry) {
-                              final quiz = entry.value;
-                              final quizId = quiz['id'] ?? '';
-                              return Card(
-                                child: ListTile(
-                                  title: Text(quiz['title'] ?? 'Untitled Quiz'),
-                                  subtitle: Text(quiz['description'] ?? ''),
-                                  trailing: isFaculty
-                                      ? Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              icon: Icon(Icons.edit, color: Colors.blueAccent),
-                                              tooltip: 'Edit Quiz',
-                                              onPressed: () {
-                                                // TODO: Implement edit quiz logic if needed
-                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Edit quiz coming soon!')));
-                                              },
-                                            ),
-                                            IconButton(
-                                              icon: Icon(Icons.delete, color: Colors.redAccent),
-                                              tooltip: 'Delete Quiz',
-                                              onPressed: () async {
-                                                final confirm = await showDialog<bool>(
-                                                  context: context,
-                                                  builder: (ctx) => AlertDialog(
-                                                    title: Text('Delete Quiz'),
-                                                    content: Text('Are you sure you want to delete this quiz?'),
-                                                    actions: [
-                                                      TextButton(
-                                                        child: Text('Cancel'),
-                                                        onPressed: () => Navigator.pop(ctx, false),
-                                                      ),
-                                                      ElevatedButton(
-                                                        child: Text('Delete'),
-                                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                                                        onPressed: () => Navigator.pop(ctx, true),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                                if (confirm == true) {
-                                                  await deleteQuiz(item['label'], quizId);
-                                                }
-                                              },
-                                            ),
-                                          ],
-                                        )
-                                      : ElevatedButton(
-                                          child: Text('Start Quiz'),
-                                          onPressed: () {
-                                            Navigator.push(context, MaterialPageRoute(
-                                              builder: (_) => TakeQuizPage(
-                                                subject: item['label'],
-                                                quizId: quizId,
-                                                quizData: quiz,
-                                              ),
-                                            ));
-                                          },
-                                        ),
-                                ),
-                              );
-                            })
-                          ],
-                        ),
-                      ),
-                    // Add Create Quiz button for teachers
-                    if (isFaculty && item.containsKey('widget'))
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: ElevatedButton.icon(
-                          icon: Icon(Icons.add_circle_outline, size: 16),
-                          label: Text('Create Quiz', style: TextStyle(fontSize: 12)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryButton,
-                            foregroundColor: Colors.white,
-                            minimumSize: Size(120, 32),
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          ),
-                          onPressed: () async {
-                            showDialog(
-                              context: context,
-                              builder: (context) {
-                                final _titleController = TextEditingController();
-                                final _descController = TextEditingController();
-                                final List<Map<String, dynamic>> questions = [];
-                                return StatefulBuilder(
-                                  builder: (context, setState) {
-                                    return AlertDialog(
-                                      title: Text('Create Quiz for ${item['label']}'),
-                                      content: SingleChildScrollView(
-                                        child: Column(
-                                          children: [
-                                            TextField(
-                                              controller: _titleController,
-                                              decoration: InputDecoration(labelText: 'Quiz Title'),
-                                            ),
-                                            TextField(
-                                              controller: _descController,
-                                              decoration: InputDecoration(labelText: 'Description'),
-                                            ),
-                                            SizedBox(height: 12),
-                                            ...questions.asMap().entries.map((entry) {
-                                              int idx = entry.key;
-                                              var q = entry.value;
-                                              return Card(
-                                                child: Padding(
-                                                  padding: EdgeInsets.all(8),
-                                                  child: Column(
-                                                    children: [
-                                                      TextField(
-                                                        decoration: InputDecoration(labelText: 'Question'),
-                                                        onChanged: (val) { q['question'] = val; },
-                                                      ),
-                                                      ...List.generate(4, (optIdx) {
-                                                        return TextField(
-                                                          decoration: InputDecoration(labelText: 'Option ${optIdx + 1}'),
-                                                          onChanged: (val) {
-                                                            if (q['options'] == null) q['options'] = List.filled(4, '');
-                                                            q['options'][optIdx] = val;
-                                                          },
-                                                        );
-                                                      }),
-                                                      TextField(
-                                                        decoration: InputDecoration(labelText: 'Correct Option (1-4)'),
-                                                        keyboardType: TextInputType.number,
-                                                        onChanged: (val) {
-                                                          q['correct'] = int.tryParse(val) ?? 1;
-                                                        },
-                                                      ),
-                                                      Row(
-                                                        mainAxisAlignment: MainAxisAlignment.end,
-                                                        children: [
-                                                          IconButton(
-                                                            icon: Icon(Icons.delete),
-                                                            onPressed: () {
-                                                              setState(() { questions.removeAt(idx); });
-                                                            },
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            }),
-                                            SizedBox(height: 8),
-                                            ElevatedButton.icon(
-                                              icon: Icon(Icons.add),
-                                              label: Text('Add Question'),
-                                              onPressed: () {
-                                                setState(() { questions.add({'question': '', 'options': List.filled(4, ''), 'correct': 1}); });
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          child: Text('Cancel'),
-                                          onPressed: () => Navigator.pop(context),
-                                        ),
-                                        ElevatedButton(
-                                          child: Text('Save Quiz'),
-                                          onPressed: () async {
-                                            print('Creating quiz for subject: ${item['label']}');
-                                            print('Quiz title: ${_titleController.text}');
-                                            print('Quiz description: ${_descController.text}');
-                                            print('Number of questions: ${questions.length}');
-                                            print('Questions data: $questions');
-                                            
-                                            final quizDoc = await firestore.collection('quizzes').doc(item['label']).collection('items').add({
-                                              'title': _titleController.text,
-                                              'description': _descController.text,
-                                              'questions': questions,
-                                              'createdBy': enrollmentNo,
-                                              'createdAt': FieldValue.serverTimestamp(),
-                                            });
-                                            
-                                            print('Quiz saved with ID: ${quizDoc.id}');
-                                            await fetchQuizzes();
-                                            Navigator.pop(context);
-                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz created!')));
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ),
                   ],
                 ),
               ),
