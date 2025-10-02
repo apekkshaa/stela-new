@@ -450,19 +450,19 @@ class _SubjectsState extends State<Subjects> {
                 if (constraints.maxWidth > 1200) {
                   // Desktop
                   crossAxisCount = 4;
-                  childAspectRatio = 0.9;
+                  childAspectRatio = 1.1;
                 } else if (constraints.maxWidth > 800) {
                   // Tablet
                   crossAxisCount = 3;
-                  childAspectRatio = 0.85;
+                  childAspectRatio = 1.05;
                 } else if (constraints.maxWidth > 600) {
                   // Large mobile
                   crossAxisCount = 2;
-                  childAspectRatio = 0.8;
+                  childAspectRatio = 1.0;
                 } else {
                   // Small mobile
                   crossAxisCount = 1;
-                  childAspectRatio = 1.2;
+                  childAspectRatio = 1.8;
                 }
 
                 return Padding(
@@ -583,7 +583,7 @@ class _SubjectsState extends State<Subjects> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: EdgeInsets.all(12),
+              padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: item['color'].withOpacity(0.08),
                 borderRadius: BorderRadius.only(
@@ -597,24 +597,24 @@ class _SubjectsState extends State<Subjects> {
                   Row(
                     children: [
                       Container(
-                        padding: EdgeInsets.all(6),
+                        padding: EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: item['color'],
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Icon(
                           item['icon'],
                           color: Colors.white,
-                          size: 18,
+                          size: 16,
                         ),
                       ),
-                      SizedBox(width: 8),
+                      SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           item['category'],
                           style: TextStyle(
                             color: item['color'],
-                            fontSize: 10,
+                            fontSize: 9,
                             fontFamily: 'PTSerif',
                             fontWeight: FontWeight.w600,
                           ),
@@ -622,12 +622,12 @@ class _SubjectsState extends State<Subjects> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 8),
+                  SizedBox(height: 6),
                   Text(
                     item['label'],
                     style: TextStyle(
                       color: primaryBar,
-                      fontSize: 14,
+                      fontSize: 13,
                       fontFamily: 'PTSerif-Bold',
                       fontWeight: FontWeight.bold,
                     ),
@@ -639,7 +639,7 @@ class _SubjectsState extends State<Subjects> {
             ),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.all(12),
+                padding: EdgeInsets.all(8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -647,7 +647,7 @@ class _SubjectsState extends State<Subjects> {
                       item['description'],
                       style: TextStyle(
                         color: primaryBar.withOpacity(0.6),
-                        fontSize: 12,
+                        fontSize: 11,
                         fontFamily: 'PTSerif',
                       ),
                       maxLines: 2,
@@ -655,10 +655,10 @@ class _SubjectsState extends State<Subjects> {
                     ),
                     Spacer(),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
                         color: primaryButton.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -669,18 +669,18 @@ class _SubjectsState extends State<Subjects> {
                                 : 'Open Module',
                             style: TextStyle(
                               color: primaryButton,
-                              fontSize: 10,
+                              fontSize: 9,
                               fontFamily: 'PTSerif',
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          SizedBox(width: 4),
+                          SizedBox(width: 3),
                           Icon(
                             item.containsKey('url')
                                 ? Icons.open_in_new
                                 : Icons.arrow_forward,
                             color: primaryButton,
-                            size: 12,
+                            size: 10,
                           ),
                         ],
                       ),
