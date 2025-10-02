@@ -14,6 +14,8 @@ import 'package:stela_app/screens/machine_learning_page.dart';
 import 'package:stela_app/screens/wireless_networks_page.dart';
 import 'package:stela_app/screens/compiler_design_page.dart';
 import 'package:stela_app/screens/computer_networks_page.dart';
+import 'package:stela_app/screens/internet_of_things_page.dart';
+import 'package:stela_app/screens/c_programming_page.dart';
 String usermanual1 =
     "https://docs.google.com/document/d/1-55-CJP_Be6KlZgdGFk6K_j7sFQeqGulqfCrZPD2bcA/edit?usp=sharing";
 String feedback =
@@ -83,6 +85,22 @@ class _SubjectsState extends State<Subjects> {
       "category": "Core Subjects",
       "color": Colors.cyan,
       "widget": WirelessNetworksPage(), // Uncomment and import if you have a page for this
+    },
+    {
+      "label": "Internet of Things",
+      "icon": Icons.sensors,
+      "description": "Learn about connected devices, sensor networks, and IoT applications",
+      "category": "Core Subjects",
+      "color": Colors.deepOrange,
+      "widget": InternetOfThingsPage(),
+    },
+    {
+      "label": "C Programming",
+      "icon": Icons.code,
+      "description": "Master the fundamentals of C programming language",
+      "category": "Core Subjects",
+      "color": Colors.blueGrey,
+      "widget": CProgrammingPage(),
     },
     {
       "label": "My Python Codes and Practice",
