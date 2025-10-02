@@ -6,6 +6,7 @@ import 'package:stela_app/screens/faculty_upload_resource.dart';
 import 'package:stela_app/screens/faculty_subjects_data.dart';
 import 'package:stela_app/screens/faculty_subject_manage.dart';
 import 'package:stela_app/screens/faculty_quiz_manage.dart';
+import 'package:stela_app/screens/faculty_quiz_portal.dart';
 import 'package:stela_app/screens/faculty_assignment_manage.dart';
 import 'package:stela_app/screens/faculty_submissions_manage.dart';
 import 'package:stela_app/screens/faculty_announcements_manage.dart';
@@ -68,20 +69,7 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
     {
       "title": "Create Quiz",
       "icon": Icons.quiz,
-      "route": Builder(
-        builder: (context) => FacultySubjectPicker(
-          subjects: facultySubjects,
-          onSubjectTap: (subject) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => FacultyQuizManage(subject: subject),
-              ),
-            );
-          },
-          title: "Select Subject to Create Quiz",
-        ),
-      ),
+      "route": FacultyQuizPortal(),
       "desc": "Add quizzes for students"
     },
     {

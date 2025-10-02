@@ -28,12 +28,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'icon': Icons.psychology, 
       'color': Colors.orange, 
       'category': 'AI & Data',
-      'units': [
-        {'name': 'Unit 1', 'topics': ['Introduction to AI', 'Python Basics', 'Data Structures']},
-        {'name': 'Unit 2', 'topics': ['Machine Learning Fundamentals', 'Supervised Learning', 'Algorithms']},
-        {'name': 'Unit 3', 'topics': ['Neural Networks', 'Deep Learning', 'TensorFlow']},
-        {'name': 'Unit 4', 'topics': ['Natural Language Processing', 'Computer Vision', 'AI Applications']}
-      ]
+      'description': 'Learn AI programming tools and techniques'
     },
     {
       'id': 'cloud_computing', 
@@ -41,12 +36,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'icon': Icons.cloud, 
       'color': Colors.blue, 
       'category': 'Engineering',
-      'units': [
-        {'name': 'Unit 1', 'topics': ['Cloud Fundamentals', 'Service Models', 'Deployment Models']},
-        {'name': 'Unit 2', 'topics': ['AWS Services', 'EC2', 'S3 Storage']},
-        {'name': 'Unit 3', 'topics': ['Azure Platform', 'Google Cloud', 'Multi-cloud Strategy']},
-        {'name': 'Unit 4', 'topics': ['Security', 'Monitoring', 'Cost Optimization']}
-      ]
+      'description': 'Explore cloud computing concepts and practices'
     },
     {
       'id': 'compiler_design', 
@@ -54,12 +44,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'icon': Icons.build, 
       'color': Colors.redAccent, 
       'category': 'Core Systems',
-      'units': [
-        {'name': 'Unit 1', 'topics': ['Lexical Analysis', 'Tokens', 'Regular Expressions']},
-        {'name': 'Unit 2', 'topics': ['Syntax Analysis', 'Parsing', 'Grammar']},
-        {'name': 'Unit 3', 'topics': ['Semantic Analysis', 'Symbol Tables', 'Type Checking']},
-        {'name': 'Unit 4', 'topics': ['Code Generation', 'Optimization', 'Runtime Environment']}
-      ]
+      'description': 'Learn about compiler construction and design'
     },
     {
       'id': 'computer_networks', 
@@ -67,12 +52,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'icon': Icons.network_check, 
       'color': Colors.lightBlue, 
       'category': 'Networking',
-      'units': [
-        {'name': 'Unit 1', 'topics': ['Network Basics', 'OSI Model', 'TCP/IP']},
-        {'name': 'Unit 2', 'topics': ['Data Link Layer', 'Ethernet', 'Switching']},
-        {'name': 'Unit 3', 'topics': ['Network Layer', 'Routing', 'IP Addressing']},
-        {'name': 'Unit 4', 'topics': ['Transport Layer', 'Application Layer', 'Network Security']}
-      ]
+      'description': 'Study computer networking concepts and protocols'
     },
     {
       'id': 'computer_organization_and_architecture', 
@@ -80,12 +60,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'icon': Icons.computer, 
       'color': Colors.green, 
       'category': 'Core Systems',
-      'units': [
-        {'name': 'Unit 1', 'topics': ['Basic Computer Organization', 'CPU', 'Memory']},
-        {'name': 'Unit 2', 'topics': ['Instruction Set Architecture', 'RISC vs CISC', 'Assembly Language']},
-        {'name': 'Unit 3', 'topics': ['Pipeline Processing', 'Cache Memory', 'Virtual Memory']},
-        {'name': 'Unit 4', 'topics': ['I/O Organization', 'Multiprocessors', 'Performance Evaluation']}
-      ]
+      'description': 'Understand computer architecture and organization'
     },
     {
       'id': 'machine_learning', 
@@ -93,12 +68,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'icon': Icons.memory, 
       'color': Colors.deepPurple, 
       'category': 'AI & Data',
-      'units': [
-        {'name': 'Unit 1', 'topics': ['ML Introduction', 'Types of Learning', 'Data Preprocessing']},
-        {'name': 'Unit 2', 'topics': ['Supervised Learning', 'Classification', 'Regression']},
-        {'name': 'Unit 3', 'topics': ['Unsupervised Learning', 'Clustering', 'Dimensionality Reduction']},
-        {'name': 'Unit 4', 'topics': ['Deep Learning', 'Neural Networks', 'Model Evaluation']}
-      ]
+      'description': 'Introduction to machine learning concepts and algorithms'
     },
     {
       'id': 'wireless_networks', 
@@ -106,12 +76,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'icon': Icons.wifi, 
       'color': Colors.cyan, 
       'category': 'Networking',
-      'units': [
-        {'name': 'Unit 1', 'topics': ['Wireless Fundamentals', 'Radio Waves', 'Antennas']},
-        {'name': 'Unit 2', 'topics': ['WiFi Standards', '802.11', 'Access Points']},
-        {'name': 'Unit 3', 'topics': ['Cellular Networks', '4G/5G', 'Mobile Communication']},
-        {'name': 'Unit 4', 'topics': ['Bluetooth', 'IoT Protocols', 'Network Security']}
-      ]
+      'description': 'Study wireless communication and networking'
     },
     {
       'id': 'internet_of_things', 
@@ -119,11 +84,413 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'icon': Icons.sensors, 
       'color': Colors.deepOrange, 
       'category': 'Engineering',
+      'description': 'Learn about connected devices, sensor networks, and IoT applications'
+    },
+    {
+      'id': 'c_programming', 
+      'title': 'C Programming', 
+      'icon': Icons.code, 
+      'color': Colors.blueGrey, 
+      'category': 'Programming',
+      'description': 'Master the fundamentals of C programming language'
+    },
+  ];
+            {'name': 'Quiz 5', 'title': 'Unit 2 Comprehensive Test', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['Neural Networks', 'Deep Learning', 'TensorFlow'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Neural Network Basics', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'Deep Learning Concepts', 'questions': 15, 'duration': '20 min'},
+            {'name': 'Quiz 3', 'title': 'TensorFlow Framework', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced Neural Networks', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Final Exam', 'questions': 30, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['Natural Language Processing', 'Computer Vision', 'AI Applications'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'NLP Fundamentals', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Computer Vision Basics', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 3', 'title': 'AI Applications', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced AI Topics', 'questions': 20, 'duration': '28 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Capstone Assessment', 'questions': 35, 'duration': '45 min'}
+          ]
+        }
+      ]
+    },
+    {
+      'id': 'cloud', 
+      'title': 'Cloud Computing', 
+      'icon': Icons.cloud, 
+      'color': Colors.blue, 
+      'category': 'Technology',
       'units': [
-        {'name': 'Unit 1', 'topics': ['IoT Introduction', 'Sensors', 'Actuators']},
-        {'name': 'Unit 2', 'topics': ['Communication Protocols', 'MQTT', 'CoAP']},
-        {'name': 'Unit 3', 'topics': ['IoT Platforms', 'Cloud Integration', 'Data Analytics']},
-        {'name': 'Unit 4', 'topics': ['Security', 'Edge Computing', 'IoT Applications']}
+        {
+          'name': 'Unit 1', 
+          'topics': ['Cloud Fundamentals', 'Service Models', 'Deployment Models'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Cloud Basics', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'Service Models Quiz', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'Deployment Strategies', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Cloud Architecture', 'questions': 15, 'duration': '20 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 1 Assessment', 'questions': 20, 'duration': '30 min'}
+          ]
+        },
+        {
+          'name': 'Unit 2', 
+          'topics': ['AWS Services', 'EC2', 'S3 Storage'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'AWS Fundamentals', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'EC2 Instances', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'S3 Storage Management', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'AWS Security', 'questions': 16, 'duration': '22 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 2 Final Test', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['Azure Platform', 'Google Cloud', 'Multi-cloud Strategy'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Azure Basics', 'questions': 9, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Google Cloud Platform', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 3', 'title': 'Multi-cloud Concepts', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Cloud Migration', 'questions': 17, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Comprehensive', 'questions': 28, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['Security', 'Monitoring', 'Cost Optimization'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Cloud Security', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 2', 'title': 'Monitoring Tools', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'Cost Management', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'Performance Optimization', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Final Exam', 'questions': 30, 'duration': '45 min'}
+          ]
+        }
+      ]
+    },
+    {
+      'id': 'compiler', 
+      'title': 'Compiler Design', 
+      'icon': Icons.build, 
+      'color': Colors.red, 
+      'category': 'Programming',
+      'units': [
+        {
+          'name': 'Unit 1', 
+          'topics': ['Lexical Analysis', 'Tokens', 'Regular Expressions'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Lexical Analysis Basics', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'Token Recognition', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'Regular Expressions', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Finite Automata', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 1 Final Assessment', 'questions': 20, 'duration': '30 min'}
+          ]
+        },
+        {
+          'name': 'Unit 2', 
+          'topics': ['Syntax Analysis', 'Parsing', 'Grammar'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Syntax Analysis Concepts', 'questions': 9, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Parsing Techniques', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 3', 'title': 'Grammar Rules', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Parse Trees', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 2 Comprehensive Test', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['Semantic Analysis', 'Symbol Tables', 'Type Checking'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Semantic Analysis', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Symbol Table Management', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Type Checking Systems', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'Error Detection', 'questions': 16, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Final Exam', 'questions': 28, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['Code Generation', 'Optimization', 'Runtime Environment'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Code Generation Basics', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 2', 'title': 'Optimization Techniques', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Runtime Environment', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced Compilation', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Capstone Test', 'questions': 30, 'duration': '45 min'}
+          ]
+        }
+      ]
+    },
+    {
+      'id': 'networks', 
+      'title': 'Computer Networks', 
+      'icon': Icons.network_check, 
+      'color': Colors.lightBlue, 
+      'category': 'Technology',
+      'units': [
+        {
+          'name': 'Unit 1', 
+          'topics': ['Network Basics', 'OSI Model', 'TCP/IP'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Network Fundamentals', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'OSI Model Layers', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'TCP/IP Protocol Suite', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Network Topologies', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 1 Assessment', 'questions': 20, 'duration': '30 min'}
+          ]
+        },
+        {
+          'name': 'Unit 2', 
+          'topics': ['Data Link Layer', 'Ethernet', 'Switching'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Data Link Layer', 'questions': 9, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Ethernet Technology', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 3', 'title': 'Switching Concepts', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'MAC Addresses', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 2 Final Test', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['Network Layer', 'Routing', 'IP Addressing'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Network Layer Functions', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Routing Protocols', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'IP Addressing Schemes', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'Subnetting', 'questions': 16, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Comprehensive', 'questions': 28, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['Transport Layer', 'Application Layer', 'Network Security'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Transport Layer Protocols', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 2', 'title': 'Application Layer Services', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Network Security Basics', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced Security', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Final Exam', 'questions': 30, 'duration': '45 min'}
+          ]
+        }
+      ]
+    },
+    {
+      'id': 'coa', 
+      'title': 'Computer Organization and Architecture', 
+      'icon': Icons.computer, 
+      'color': Colors.green, 
+      'category': 'Hardware',
+      'units': [
+        {
+          'name': 'Unit 1', 
+          'topics': ['Basic Computer Organization', 'CPU', 'Memory'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Computer Organization Basics', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'CPU Architecture', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'Memory Systems', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'System Components', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 1 Final Assessment', 'questions': 20, 'duration': '30 min'}
+          ]
+        },
+        {
+          'name': 'Unit 2', 
+          'topics': ['Instruction Set Architecture', 'RISC vs CISC', 'Assembly Language'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Instruction Set Design', 'questions': 9, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'RISC vs CISC', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 3', 'title': 'Assembly Programming', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Machine Language', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 2 Comprehensive', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['Pipeline Processing', 'Cache Memory', 'Virtual Memory'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Pipeline Concepts', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Cache Design', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Virtual Memory', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'Memory Hierarchy', 'questions': 16, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Final Exam', 'questions': 28, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['I/O Organization', 'Multiprocessors', 'Performance Evaluation'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'I/O Systems', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 2', 'title': 'Multiprocessor Systems', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Performance Analysis', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced Architecture', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Capstone Test', 'questions': 30, 'duration': '45 min'}
+          ]
+        }
+      ]
+    },
+    {
+      'id': 'ml', 
+      'title': 'Machine Learning', 
+      'icon': Icons.memory, 
+      'color': Colors.deepPurple, 
+      'category': 'AI/ML',
+      'units': [
+        {
+          'name': 'Unit 1', 
+          'topics': ['ML Introduction', 'Types of Learning', 'Data Preprocessing'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'ML Fundamentals', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'Learning Types', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'Data Preprocessing', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Feature Engineering', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 1 Assessment', 'questions': 20, 'duration': '30 min'}
+          ]
+        },
+        {
+          'name': 'Unit 2', 
+          'topics': ['Supervised Learning', 'Classification', 'Regression'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Supervised Learning Basics', 'questions': 9, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Classification Algorithms', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 3', 'title': 'Regression Analysis', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Model Selection', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 2 Final Test', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['Unsupervised Learning', 'Clustering', 'Dimensionality Reduction'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Unsupervised Learning', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Clustering Methods', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Dimensionality Reduction', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced Clustering', 'questions': 16, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Comprehensive', 'questions': 28, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['Deep Learning', 'Neural Networks', 'Model Evaluation'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Neural Networks', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 2', 'title': 'Deep Learning Models', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Model Evaluation', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced ML', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Final Exam', 'questions': 30, 'duration': '45 min'}
+          ]
+        }
+      ]
+    },
+    {
+      'id': 'wireless', 
+      'title': 'Wireless Networks', 
+      'icon': Icons.wifi, 
+      'color': Colors.cyan, 
+      'category': 'Technology',
+      'units': [
+        {
+          'name': 'Unit 1', 
+          'topics': ['Wireless Fundamentals', 'Radio Waves', 'Antennas'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Wireless Basics', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'Radio Wave Propagation', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'Antenna Design', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Signal Processing', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 1 Assessment', 'questions': 20, 'duration': '30 min'}
+          ]
+        },
+        {
+          'name': 'Unit 2', 
+          'topics': ['WiFi Standards', '802.11', 'Access Points'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'WiFi Standards', 'questions': 9, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': '802.11 Protocols', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 3', 'title': 'Access Point Configuration', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'WLAN Security', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 2 Final Test', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['Cellular Networks', '4G/5G', 'Mobile Communication'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Cellular Architecture', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': '4G Technology', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': '5G Networks', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'Mobile Communication', 'questions': 16, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Comprehensive', 'questions': 28, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['Bluetooth', 'IoT Protocols', 'Network Security'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Bluetooth Technology', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 2', 'title': 'IoT Communication', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Wireless Security', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced Protocols', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Final Exam', 'questions': 30, 'duration': '45 min'}
+          ]
+        }
+      ]
+    },
+    {
+      'id': 'iot', 
+      'title': 'Internet of Things', 
+      'icon': Icons.sensors, 
+      'color': Colors.deepOrange, 
+      'category': 'Technology',
+      'units': [
+        {
+          'name': 'Unit 1', 
+          'topics': ['IoT Introduction', 'Sensors', 'Actuators'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'IoT Fundamentals', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'Sensor Technology', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'Actuator Systems', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'IoT Components', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 1 Assessment', 'questions': 20, 'duration': '30 min'}
+          ]
+        },
+        {
+          'name': 'Unit 2', 
+          'topics': ['Communication Protocols', 'MQTT', 'CoAP'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'IoT Protocols', 'questions': 9, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'MQTT Protocol', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 3', 'title': 'CoAP Implementation', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Protocol Comparison', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 2 Final Test', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['IoT Platforms', 'Cloud Integration', 'Data Analytics'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'IoT Platforms', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Cloud Integration', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Data Analytics', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'Big Data in IoT', 'questions': 16, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Comprehensive', 'questions': 28, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['Security', 'Edge Computing', 'IoT Applications'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'IoT Security', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 2', 'title': 'Edge Computing', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'IoT Applications', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 4', 'title': 'Industry 4.0', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Final Exam', 'questions': 30, 'duration': '45 min'}
+          ]
+        }
       ]
     },
     {
@@ -133,10 +500,50 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       'color': Colors.blueGrey, 
       'category': 'Programming',
       'units': [
-        {'name': 'Unit 1', 'topics': ['C Basics', 'Variables', 'Data Types']},
-        {'name': 'Unit 2', 'topics': ['Control Structures', 'Loops', 'Functions']},
-        {'name': 'Unit 3', 'topics': ['Arrays', 'Pointers', 'Strings']},
-        {'name': 'Unit 4', 'topics': ['Structures', 'File Handling', 'Dynamic Memory']}
+        {
+          'name': 'Unit 1', 
+          'topics': ['C Basics', 'Variables', 'Data Types'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'C Language Basics', 'questions': 8, 'duration': '12 min'},
+            {'name': 'Quiz 2', 'title': 'Variables & Constants', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 3', 'title': 'Data Types', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Input/Output', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 1 Assessment', 'questions': 20, 'duration': '30 min'}
+          ]
+        },
+        {
+          'name': 'Unit 2', 
+          'topics': ['Control Structures', 'Loops', 'Functions'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Control Structures', 'questions': 9, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Loop Constructs', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 3', 'title': 'Function Programming', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 4', 'title': 'Recursion', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 2 Final Test', 'questions': 25, 'duration': '35 min'}
+          ]
+        },
+        {
+          'name': 'Unit 3', 
+          'topics': ['Arrays', 'Pointers', 'Strings'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Array Fundamentals', 'questions': 10, 'duration': '15 min'},
+            {'name': 'Quiz 2', 'title': 'Pointer Concepts', 'questions': 12, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'String Manipulation', 'questions': 14, 'duration': '20 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced Pointers', 'questions': 16, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 3 Comprehensive', 'questions': 28, 'duration': '40 min'}
+          ]
+        },
+        {
+          'name': 'Unit 4', 
+          'topics': ['Structures', 'File Handling', 'Dynamic Memory'],
+          'quizzes': [
+            {'name': 'Quiz 1', 'title': 'Structures & Unions', 'questions': 11, 'duration': '16 min'},
+            {'name': 'Quiz 2', 'title': 'File Operations', 'questions': 13, 'duration': '18 min'},
+            {'name': 'Quiz 3', 'title': 'Dynamic Memory', 'questions': 15, 'duration': '22 min'},
+            {'name': 'Quiz 4', 'title': 'Advanced C Programming', 'questions': 18, 'duration': '25 min'},
+            {'name': 'Quiz 5', 'title': 'Unit 4 Final Exam', 'questions': 30, 'duration': '45 min'}
+          ]
+        }
       ]
     },
   ];
@@ -194,18 +601,6 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       // Get faculty quizzes for this subject
       List<Map<String, dynamic>> facultyQuizzes = _facultyQuizzes[subjectId] ?? [];
       
-      // Create a deep copy of units to make them modifiable
-      List<Map<String, dynamic>> units = [];
-      for (var unit in (updatedSubject['units'] ?? [])) {
-        // Start with clean units (no static quizzes)
-        Map<String, dynamic> cleanUnit = {
-          'name': unit['name'],
-          'topics': unit['topics'],
-          'quizzes': [], // Initialize with empty quizzes array
-        };
-        units.add(cleanUnit);
-      }
-      
       if (facultyQuizzes.isNotEmpty) {
         // Group faculty quizzes by unit
         Map<String, List<Map<String, dynamic>>> quizzesByUnit = {};
@@ -220,7 +615,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
             'name': quiz['title'],
             'title': quiz['title'],
             'questions': quiz['questions']?.length ?? 0,
-            'duration': quiz['duration'],
+            'duration': quiz['duration'] ?? '30 min',
             'id': quiz['id'],
             'isFromFaculty': true,
             'date': quiz['date'],
@@ -229,18 +624,8 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
           });
         }
         
-        // Add faculty quizzes to the corresponding units
-        for (int i = 0; i < units.length; i++) {
-          String unitName = units[i]['name'];
-          if (quizzesByUnit.containsKey(unitName)) {
-            units[i]['quizzes'] = quizzesByUnit[unitName]!;
-            
-            // Remove from the map since we've processed it
-            quizzesByUnit.remove(unitName);
-          }
-        }
-        
-        // Create new units for any remaining faculty quizzes that don't match existing units
+        // Create units based on faculty quizzes only
+        List<Map<String, dynamic>> units = [];
         quizzesByUnit.forEach((unitName, quizzes) {
           units.add({
             'name': unitName,
@@ -249,10 +634,30 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
             'isFacultyUnit': true,
           });
         });
+        
+        // Sort units by name (Unit 1, Unit 2, etc.)
+        units.sort((a, b) {
+          String nameA = a['name'];
+          String nameB = b['name'];
+          
+          // Extract unit numbers for proper sorting
+          RegExp unitRegex = RegExp(r'Unit (\d+)');
+          Match? matchA = unitRegex.firstMatch(nameA);
+          Match? matchB = unitRegex.firstMatch(nameB);
+          
+          if (matchA != null && matchB != null) {
+            int unitA = int.parse(matchA.group(1)!);
+            int unitB = int.parse(matchB.group(1)!);
+            return unitA.compareTo(unitB);
+          }
+          
+          return nameA.compareTo(nameB);
+        });
+        
+        updatedSubject['units'] = units;
+        updatedSubjects.add(updatedSubject);
       }
-      
-      updatedSubject['units'] = units;
-      updatedSubjects.add(updatedSubject);
+      // Only add subjects that have faculty quizzes
     }
     
     return updatedSubjects;
@@ -261,6 +666,17 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
   bool _hasFacultyQuizzes(Map<String, dynamic> subject) {
     String subjectId = subject['id'];
     return _facultyQuizzes[subjectId]?.isNotEmpty ?? false;
+  }
+
+  int _getTotalQuizCount(Map<String, dynamic> subject) {
+    if (subject['units'] == null) return 0;
+    int total = 0;
+    for (var unit in subject['units']) {
+      if (unit['quizzes'] != null) {
+        total += (unit['quizzes'] as List).length;
+      }
+    }
+    return total;
   }
 
   @override
@@ -441,7 +857,43 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
                   ),
                 ),
               )
-            : SliverPadding(
+            : filteredSubjects.isEmpty
+              ? SliverToBoxAdapter(
+                  child: Container(
+                    height: 300,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.quiz_outlined,
+                            size: 64,
+                            color: primaryBar.withOpacity(0.3),
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'No Faculty Quizzes Available',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: primaryBar.withOpacity(0.7),
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Faculty haven\'t created any quizzes yet.\nPlease check back later.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: primaryBar.withOpacity(0.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : SliverPadding(
                 padding: EdgeInsets.all(16),
                 sliver: SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -535,32 +987,30 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
                       Row(
                         children: [
                           Text(
-                            subject['category'],
+                            '${_getTotalQuizCount(subject)} Faculty Quizzes',
                             style: TextStyle(
                               fontSize: 10,
-                              color: primaryBar.withOpacity(0.6),
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.w600,
                               fontFamily: 'PTSerif',
                             ),
                           ),
-                          // Show faculty quiz indicator
-                          if (_hasFacultyQuizzes(subject)) ...[
-                            SizedBox(width: 8),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'Faculty Quizzes',
-                                style: TextStyle(
-                                  fontSize: 8,
-                                  color: Colors.orange[800],
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          SizedBox(width: 8),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: subject['color'].withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              subject['category'],
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: subject['color'],
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ],

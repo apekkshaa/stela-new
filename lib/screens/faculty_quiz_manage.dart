@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' as xl;
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 // import 'package:pdf_text/pdf_text.dart'; // Removed: not available
 // For docx parsing, you may use: import 'package:docx_parse/docx_parse.dart'; (add to pubspec if needed)
 import 'package:firebase_core/firebase_core.dart';
@@ -79,6 +81,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                 'unit': subValue['unit']?.toString() ?? key.toString().replaceAll('_', ' '),
                 'originalUnit': key.toString().replaceAll('_', ' '), // Track original unit for editing
                 'questions': subValue['questions'] ?? [],
+                'duration': subValue['duration']?.toString() ?? '30 min',
               });
             }
           });
@@ -91,6 +94,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
               'date': value['date']?.toString() ?? '',
               'unit': value['unit']?.toString() ?? 'Unit 1',
               'questions': value['questions'] ?? [],
+              'duration': value['duration']?.toString() ?? '30 min',
             });
           }
         }
@@ -105,13 +109,14 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
   Future<void> _addQuiz(dynamic quizData) async {
     final date = DateTime.now().toString().substring(0, 10);
     final unitName = quizData is Map && quizData['unit'] != null ? quizData['unit'] : 'Unit 1';
+    final duration = quizData is Map && quizData['duration'] != null ? '${quizData['duration']} min' : '30 min';
     final newQuiz = {
       'title': quizData is String ? quizData : quizData['title'],
       'date': date,
       'unit': unitName,
       'questions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
       'facultyQuestions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
-      'duration': '15 min',
+      'duration': duration,
       'totalMarks': quizData is Map && quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
     };
     
@@ -128,6 +133,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
   Future<void> _editQuiz(String key, String originalUnit, dynamic quizData) async {
     final newUnitName = quizData['unit'] ?? 'Unit 1';
     final originalUnitName = originalUnit;
+    final duration = quizData['duration'] != null ? '${quizData['duration']} min' : '30 min';
     
     final updatedQuiz = {
       'title': quizData['title'],
@@ -135,7 +141,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       'unit': newUnitName,
       'questions': quizData['questions'] ?? [],
       'facultyQuestions': quizData['questions'] ?? [],
-      'duration': '15 min',
+      'duration': duration,
       'totalMarks': quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
     };
     
@@ -164,6 +170,147 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     }
     
     await _loadQuizzes();
+  }
+
+  Future<void> _processExcelFile(FilePickerResult result) async {
+    try {
+      print('Starting Excel file processing...');
+      
+      // Step 1: Read file bytes
+      Uint8List bytes;
+      if (kIsWeb) {
+        // On web, use the bytes directly from file picker
+        bytes = result.files.single.bytes!;
+        print('Web: File read successfully, bytes: ${bytes.length}');
+      } else {
+        // On mobile/desktop, read from file path
+        final file = File(result.files.single.path!);
+        bytes = await file.readAsBytes();
+        print('Mobile: File read successfully, bytes: ${bytes.length}');
+      }
+      
+      // Step 2: Parse Excel - try the original approach for all platforms
+      List<Map<String, dynamic>> questions = [];
+      try {
+        print('Attempting to decode Excel file...');
+        final excel = xl.Excel.decodeBytes(bytes);
+        print('Excel decoded successfully, tables: ${excel.tables.keys.length}');
+        
+        for (var table in excel.tables.keys) {
+          var sheet = excel.tables[table]!;
+          bool isHeaderRow = true;
+          print('Processing sheet: $table with ${sheet.rows.length} rows');
+          
+          for (var row in sheet.rows) {
+            if (isHeaderRow) {
+              isHeaderRow = false;
+              continue;
+            }
+            
+            if (row.length >= 6 && row[0]?.value != null) {
+              String question = row[0]?.value?.toString() ?? '';
+              List<String> options = [
+                row[1]?.value?.toString() ?? '',
+                row[2]?.value?.toString() ?? '',
+                row[3]?.value?.toString() ?? '',
+                row[4]?.value?.toString() ?? '',
+              ];
+              
+              // Handle both letter (A, B, C, D) and number (1, 2, 3, 4) formats
+              String answerValue = row[5]?.value?.toString().trim().toUpperCase() ?? '';
+              int correct = 0; // Default to first option
+              
+              if (answerValue == 'A' || answerValue == '1') {
+                correct = 0;
+              } else if (answerValue == 'B' || answerValue == '2') {
+                correct = 1;
+              } else if (answerValue == 'C' || answerValue == '3') {
+                correct = 2;
+              } else if (answerValue == 'D' || answerValue == '4') {
+                correct = 3;
+              } else {
+                // Try to parse as number and convert to 0-based index
+                int? numAnswer = int.tryParse(answerValue);
+                if (numAnswer != null && numAnswer >= 1 && numAnswer <= 4) {
+                  correct = numAnswer - 1;
+                }
+              }
+              
+              print('Question: $question');
+              print('Options: $options');
+              print('Answer value: "$answerValue" -> Index: $correct');
+              
+              if (question.isNotEmpty && options.any((opt) => opt.isNotEmpty)) {
+                questions.add({
+                  'question': question,
+                  'options': options,
+                  'correct': correct,
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        print('Excel parsing error: $e');
+        print('Error type: ${e.runtimeType}');
+        
+        // If it's the namespace error, provide a more specific message
+        if (e.toString().contains('_Namespace') || e.toString().contains('Unsupported operation')) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Excel processing failed on web. Please try using the mobile app or create quiz manually.'),
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+          return;
+        } else {
+          throw Exception('Failed to parse Excel file: $e');
+        }
+      }
+      
+      print('Parsed ${questions.length} questions from Excel');
+      
+      // Step 3: Process results
+      if (questions.isNotEmpty) {
+        // Use file name (without extension) as quiz title
+        String quizTitle = result.files.single.name;
+        if (quizTitle.contains('.')) {
+          quizTitle = quizTitle.substring(0, quizTitle.lastIndexOf('.'));
+        }
+        
+        print('Attempting to add quiz: $quizTitle');
+        
+        // Step 4: Save to Firebase
+        try {
+          await _addQuiz({'title': quizTitle, 'questions': questions});
+          print('Quiz added successfully to Firebase');
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Quiz uploaded successfully with ${questions.length} questions!')),
+            );
+          }
+        } catch (e) {
+          print('Firebase save error: $e');
+          throw Exception('Failed to save quiz to database: $e');
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No valid questions found in the uploaded file.')),
+          );
+        }
+      }
+    } catch (e) {
+      print('Overall processing error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error processing file: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   @override
@@ -217,71 +364,20 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                           ),
                         ),
                         onPressed: () async {
-                          FilePickerResult? result = await FilePicker.platform.pickFiles(
-                            type: FileType.custom,
-                            allowedExtensions: ['xlsx', 'xls'],
-                          );
+                          try {
+                            FilePickerResult? result = await FilePicker.platform.pickFiles(
+                              type: FileType.custom,
+                              allowedExtensions: ['xlsx', 'xls'],
+                            );
 
-                          if (result != null) {
-                            try {
-                              final file = File(result.files.single.path!);
-                              final bytes = await file.readAsBytes();
-                              final excel = Excel.decodeBytes(bytes);
-                              
-                              List<Map<String, dynamic>> questions = [];
-                              
-                              for (var table in excel.tables.keys) {
-                                var sheet = excel.tables[table]!;
-                                bool isHeaderRow = true;
-                                
-                                for (var row in sheet.rows) {
-                                  if (isHeaderRow) {
-                                    isHeaderRow = false;
-                                    continue;
-                                  }
-                                  
-                                  if (row.length >= 6 && row[0]?.value != null) {
-                                    String question = row[0]?.value?.toString() ?? '';
-                                    List<String> options = [
-                                      row[1]?.value?.toString() ?? '',
-                                      row[2]?.value?.toString() ?? '',
-                                      row[3]?.value?.toString() ?? '',
-                                      row[4]?.value?.toString() ?? '',
-                                    ];
-                                    int correct = int.tryParse(row[5]?.value?.toString() ?? '0') ?? 0;
-                                    
-                                    if (question.isNotEmpty && options.any((opt) => opt.isNotEmpty)) {
-                                      questions.add({
-                                        'question': question,
-                                        'options': options,
-                                        'correct': correct - 1, // Convert 1-based to 0-based
-                                      });
-                                    }
-                                  }
-                                }
-                              }
-                              
-                              if (questions.isNotEmpty) {
-                                // Use file name (without extension) as quiz title
-                                String quizTitle = result.files.single.name;
-                                if (quizTitle.contains('.')) {
-                                  quizTitle = quizTitle.substring(0, quizTitle.lastIndexOf('.'));
-                                }
-                                
-                                await _addQuiz({'title': quizTitle, 'questions': questions});
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Quiz uploaded successfully with ${questions.length} questions!')),
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('No valid questions found in the uploaded file.')),
-                                );
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error processing file: $e')),
-                              );
+                            if (result != null) {
+                              await _processExcelFile(result);
                             }
+                          } catch (e) {
+                            print('File picker error: $e');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error selecting file: ${e.toString()}')),
+                            );
                           }
                         },
                       ),
@@ -318,6 +414,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                     children: [
                                       Text("Unit: ${quiz['unit'] ?? 'Unit 1'}"),
                                       Text("Date: ${quiz['date']}"),
+                                      Text("Duration: ${quiz['duration'] ?? '30 min'}", style: TextStyle(color: subject['color'], fontWeight: FontWeight.w500)),
                                     ],
                                   ),
                                   trailing: Row(
@@ -346,6 +443,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                                 subject: subject,
                                                 initialTitle: quiz['title'],
                                                 initialQuestions: questionsList,
+                                                initialDuration: quiz['duration'] is int ? quiz['duration'] : (quiz['duration'] is String ? int.tryParse(quiz['duration']) : null),
                                               ),
                                             ),
                                           );
@@ -392,7 +490,8 @@ class QuizCreationForm extends StatefulWidget {
   final Map<String, dynamic> subject;
   final String? initialTitle;
   final List<Map<String, dynamic>>? initialQuestions;
-  const QuizCreationForm({required this.subject, this.initialTitle, this.initialQuestions});
+  final int? initialDuration;
+  const QuizCreationForm({required this.subject, this.initialTitle, this.initialQuestions, this.initialDuration});
 
   @override
   _QuizCreationFormState createState() => _QuizCreationFormState();
@@ -402,6 +501,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
   final _formKey = GlobalKey<FormState>();
   String quizTitle = "";
   String? selectedUnit;
+  int duration = 30; // Default 30 minutes
   List<String> availableUnits = [];
   List<Map<String, dynamic>> questions = [];
 
@@ -409,6 +509,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
   void initState() {
     super.initState();
     quizTitle = widget.initialTitle ?? "";
+    duration = widget.initialDuration ?? 30;
     
     // Initialize available units from subject data
     if (widget.subject['units'] != null) {
@@ -493,6 +594,37 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                     });
                   },
                   validator: (value) => value == null ? "Please select a unit" : null,
+                ),
+                SizedBox(height: 16),
+                TextFormField(
+                  decoration: InputDecoration(
+                    labelText: "Quiz Duration (minutes)",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.access_time),
+                    suffixText: "min",
+                  ),
+                  initialValue: duration.toString(),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Enter quiz duration";
+                    }
+                    final minutes = int.tryParse(value);
+                    if (minutes == null || minutes <= 0) {
+                      return "Enter a valid duration in minutes";
+                    }
+                    if (minutes > 300) {
+                      return "Duration cannot exceed 300 minutes";
+                    }
+                    return null;
+                  },
+                  onSaved: (value) => duration = int.tryParse(value ?? "30") ?? 30,
+                  onChanged: (value) {
+                    final parsed = int.tryParse(value);
+                    if (parsed != null && parsed > 0) {
+                      duration = parsed;
+                    }
+                  },
                 ),
                 SizedBox(height: 24),
                 Text(
@@ -624,11 +756,12 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                         );
                         return;
                       }
-                      // Return a map with title, questions, and unit
+                      // Return a map with title, questions, unit, and duration
                       Navigator.pop(context, {
                         'title': quizTitle,
                         'questions': questions,
                         'unit': selectedUnit,
+                        'duration': duration,
                       });
                     }
                   },
