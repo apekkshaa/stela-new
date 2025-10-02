@@ -82,6 +82,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                 'originalUnit': key.toString().replaceAll('_', ' '), // Track original unit for editing
                 'questions': subValue['questions'] ?? [],
                 'duration': subValue['duration']?.toString() ?? '30 min',
+                'pin': subValue['pin']?.toString() ?? '',
               });
             }
           });
@@ -95,6 +96,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
               'unit': value['unit']?.toString() ?? 'Unit 1',
               'questions': value['questions'] ?? [],
               'duration': value['duration']?.toString() ?? '30 min',
+              'pin': value['pin']?.toString() ?? '',
             });
           }
         }
@@ -110,6 +112,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     final date = DateTime.now().toString().substring(0, 10);
     final unitName = quizData is Map && quizData['unit'] != null ? quizData['unit'] : 'Unit 1';
     final duration = quizData is Map && quizData['duration'] != null ? '${quizData['duration']} min' : '30 min';
+    final pin = quizData is Map && quizData['pin'] != null ? quizData['pin'] : '';
     final newQuiz = {
       'title': quizData is String ? quizData : quizData['title'],
       'date': date,
@@ -117,6 +120,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       'questions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
       'facultyQuestions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
       'duration': duration,
+      'pin': pin,
       'totalMarks': quizData is Map && quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
     };
     
@@ -125,7 +129,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     final newRef = unitRef.push();
     await newRef.set(newQuiz);
     setState(() {
-      previousQuizzes.add({'key': newRef.key, 'title': newQuiz['title'], 'date': date, 'unit': unitName, 'questions': newQuiz['questions']});
+      previousQuizzes.add({'key': newRef.key, 'title': newQuiz['title'], 'date': date, 'unit': unitName, 'questions': newQuiz['questions'], 'pin': pin});
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz added to $unitName!')));
   }
@@ -134,6 +138,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     final newUnitName = quizData['unit'] ?? 'Unit 1';
     final originalUnitName = originalUnit;
     final duration = quizData['duration'] != null ? '${quizData['duration']} min' : '30 min';
+    final pin = quizData['pin'] ?? '';
     
     final updatedQuiz = {
       'title': quizData['title'],
@@ -142,6 +147,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       'questions': quizData['questions'] ?? [],
       'facultyQuestions': quizData['questions'] ?? [],
       'duration': duration,
+      'pin': pin,
       'totalMarks': quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
     };
     
@@ -444,6 +450,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                                 initialTitle: quiz['title'],
                                                 initialQuestions: questionsList,
                                                 initialDuration: quiz['duration'] is int ? quiz['duration'] : (quiz['duration'] is String ? int.tryParse(quiz['duration']) : null),
+                                                initialPin: quiz['pin']?.toString() ?? '',
                                               ),
                                             ),
                                           );
@@ -491,7 +498,8 @@ class QuizCreationForm extends StatefulWidget {
   final String? initialTitle;
   final List<Map<String, dynamic>>? initialQuestions;
   final int? initialDuration;
-  const QuizCreationForm({required this.subject, this.initialTitle, this.initialQuestions, this.initialDuration});
+  final String? initialPin;
+  const QuizCreationForm({required this.subject, this.initialTitle, this.initialQuestions, this.initialDuration, this.initialPin});
 
   @override
   _QuizCreationFormState createState() => _QuizCreationFormState();
@@ -502,6 +510,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
   String quizTitle = "";
   String? selectedUnit;
   int duration = 30; // Default 30 minutes
+  String pin = ""; // 6-digit PIN
   List<String> availableUnits = [];
   List<Map<String, dynamic>> questions = [];
 
@@ -510,6 +519,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
     super.initState();
     quizTitle = widget.initialTitle ?? "";
     duration = widget.initialDuration ?? 30;
+    pin = widget.initialPin ?? "";
     
     // Initialize available units from subject data
     if (widget.subject['units'] != null) {
@@ -538,6 +548,11 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
         'correct': null, // No option pre-selected
       });
     });
+  }
+
+  String _generateRandomPin() {
+    final random = DateTime.now().millisecondsSinceEpoch;
+    return (random % 900000 + 100000).toString(); // Ensures 6 digits
   }
 
   bool _validateCorrectAnswers() {
@@ -625,6 +640,40 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                       duration = parsed;
                     }
                   },
+                ),
+                SizedBox(height: 16),
+                TextFormField(
+                  decoration: InputDecoration(
+                    labelText: "Quiz Access PIN (6 digits, optional)",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.refresh),
+                      tooltip: "Generate Random PIN",
+                      onPressed: () {
+                        setState(() {
+                          pin = _generateRandomPin();
+                        });
+                      },
+                    ),
+                    helperText: "Optional: Students need this PIN to start the quiz (leave empty for no PIN)",
+                  ),
+                  initialValue: pin,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      if (value.length != 6) {
+                        return "PIN must be exactly 6 digits";
+                      }
+                      if (!RegExp(r'^\d{6}$').hasMatch(value)) {
+                        return "PIN must contain only numbers";
+                      }
+                    }
+                    return null;
+                  },
+                  onSaved: (value) => pin = value ?? "",
+                  onChanged: (value) => pin = value,
                 ),
                 SizedBox(height: 24),
                 Text(
@@ -756,12 +805,13 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                         );
                         return;
                       }
-                      // Return a map with title, questions, unit, and duration
+                      // Return a map with title, questions, unit, duration, and pin
                       Navigator.pop(context, {
                         'title': quizTitle,
                         'questions': questions,
                         'unit': selectedUnit,
                         'duration': duration,
+                        'pin': pin,
                       });
                     }
                   },

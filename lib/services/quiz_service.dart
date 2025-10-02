@@ -51,6 +51,7 @@ class QuizService {
                   'questions': _parseQuestions(quizValue['facultyQuestions'] ?? quizValue['questions']),
                   'duration': quizValue['duration']?.toString() ?? _calculateDuration(quizValue['questions']),
                   'totalMarks': quizValue['totalMarks']?.toString() ?? '0',
+                  'pin': quizValue['pin']?.toString() ?? '',
                   'isFromFaculty': true,
                 });
               }
@@ -68,6 +69,7 @@ class QuizService {
                 'questions': _parseQuestions(unitValue['facultyQuestions'] ?? unitValue['questions']),
                 'duration': unitValue['duration']?.toString() ?? _calculateDuration(unitValue['questions']),
                 'totalMarks': unitValue['totalMarks']?.toString() ?? '0',
+                'pin': unitValue['pin']?.toString() ?? '',
                 'isFromFaculty': true,
               });
             }

@@ -77,6 +77,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           'date': quiz['date'],
           'unit': quiz['unit'],
           'facultyQuestions': quiz['questions'],
+          'pin': quiz['pin'], // Add the PIN field
         });
       }
       
@@ -1151,22 +1152,42 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
+                      onPressed: () async {
                         if (isFacultyQuiz && quiz['facultyQuestions'] != null && (quiz['facultyQuestions'] as List).isNotEmpty) {
-                          // Start faculty quiz with actual questions
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FacultyQuizTakingScreen(
-                                quiz: quiz,
-                                subject: widget.subject,
+                          // Check if quiz has a PIN requirement
+                          String quizPin = quiz['pin']?.toString() ?? '';
+                          if (quizPin.isNotEmpty) {
+                            // Show PIN verification dialog
+                            bool pinVerified = await _showPinVerificationDialog(context, quizPin);
+                            if (!pinVerified) {
+                              return; // Don't start quiz if PIN verification failed
+                            }
+                          }
+                          
+                          // Close the quiz details dialog first
+                          Navigator.pop(context);
+                          
+                          // Check if context is still mounted before navigating
+                          if (mounted) {
+                            // Start faculty quiz with actual questions
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FacultyQuizTakingScreen(
+                                  quiz: quiz,
+                                  subject: widget.subject,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
                         } else {
-                          // Show coming soon for static quizzes
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          // Close the dialog first
+                          Navigator.pop(context);
+                          
+                          // Check if context is still mounted before showing snackbar
+                          if (mounted) {
+                            // Show coming soon for static quizzes
+                            ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Row(
                                 children: [
@@ -1190,6 +1211,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                               margin: EdgeInsets.all(16),
                             ),
                           );
+                          }
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -1221,5 +1243,153 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
         ),
       ),
     );
+  }
+
+  Future<bool> _showPinVerificationDialog(BuildContext context, String correctPin) async {
+    TextEditingController _pinController = TextEditingController();
+    bool isCorrect = false;
+    
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    color: primaryBar,
+                    size: 24,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Enter Quiz PIN',
+                    style: TextStyle(
+                      fontFamily: 'PTSerif',
+                      fontWeight: FontWeight.bold,
+                      color: primaryBar,
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'This quiz requires a 6-digit PIN to access.',
+                    style: TextStyle(
+                      fontFamily: 'PTSerif',
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  TextField(
+                    controller: _pinController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 4,
+                      fontFamily: 'PTSerif',
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'PIN',
+                      labelStyle: TextStyle(
+                        fontFamily: 'PTSerif',
+                        color: primaryBar,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryBar),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryBar, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryBar.withOpacity(0.3)),
+                      ),
+                      prefixIcon: Icon(Icons.pin, color: primaryBar),
+                      counterText: '',
+                    ),
+                    onChanged: (value) {
+                      if (value.length == 6) {
+                        // Auto-validate when 6 digits are entered
+                        setState(() {});
+                      }
+                    },
+                  ),
+                  if (_pinController.text.isNotEmpty && _pinController.text != correctPin)
+                    Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Incorrect PIN. Please try again.',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                          fontFamily: 'PTSerif',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontFamily: 'PTSerif',
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: _pinController.text.length == 6
+                      ? () {
+                          if (_pinController.text == correctPin) {
+                            isCorrect = true;
+                            Navigator.of(context).pop();
+                          } else {
+                            setState(() {
+                              // This will trigger the error message display
+                            });
+                          }
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryBar,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Verify',
+                    style: TextStyle(
+                      fontFamily: 'PTSerif',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    
+    return isCorrect;
   }
 }
