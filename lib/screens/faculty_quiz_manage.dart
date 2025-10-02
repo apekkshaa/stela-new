@@ -17,8 +17,27 @@ class FacultyQuizManage extends StatefulWidget {
 }
 
 class _FacultyQuizManageState extends State<FacultyQuizManage> {
-  Future<void> _deleteQuiz(String key) async {
-    await _quizRef.child(key).remove();
+  Future<void> _deleteQuiz(String key, String? unitName) async {
+    if (unitName != null) {
+      // Delete from specific unit
+      final unitRef = _quizRef.child(unitName.replaceAll(' ', '_'));
+      await unitRef.child(key).remove();
+    } else {
+      // Fallback: try to find and delete from any unit
+      final snapshot = await _quizRef.get();
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        for (var unitKey in data.keys) {
+          if (data[unitKey] is Map) {
+            final unitData = data[unitKey] as Map<dynamic, dynamic>;
+            if (unitData.containsKey(key)) {
+              await _quizRef.child(unitKey).child(key).remove();
+              break;
+            }
+          }
+        }
+      }
+    }
     await _loadQuizzes();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz deleted!')));
   }
@@ -44,14 +63,36 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     List<Map<String, dynamic>> loaded = [];
     if (snapshot.exists) {
       final data = snapshot.value as Map<dynamic, dynamic>;
+      
+      // Handle both old structure (direct quizzes) and new structure (unit-based)
       data.forEach((key, value) {
         if (value is Map) {
-          loaded.add({
-            'key': key,
-            'title': value['title']?.toString() ?? '',
-            'date': value['date']?.toString() ?? '',
-            'questions': value['questions'] ?? [],
+          // Check if this is a unit (contains nested quizzes) or a direct quiz
+          bool isUnit = false;
+          value.forEach((subKey, subValue) {
+            if (subValue is Map && subValue.containsKey('title') && subValue.containsKey('questions')) {
+              isUnit = true;
+              loaded.add({
+                'key': subKey,
+                'title': subValue['title']?.toString() ?? '',
+                'date': subValue['date']?.toString() ?? '',
+                'unit': subValue['unit']?.toString() ?? key.toString().replaceAll('_', ' '),
+                'originalUnit': key.toString().replaceAll('_', ' '), // Track original unit for editing
+                'questions': subValue['questions'] ?? [],
+              });
+            }
           });
+          
+          // If not a unit, treat as direct quiz (backward compatibility)
+          if (!isUnit && value.containsKey('title')) {
+            loaded.add({
+              'key': key,
+              'title': value['title']?.toString() ?? '',
+              'date': value['date']?.toString() ?? '',
+              'unit': value['unit']?.toString() ?? 'Unit 1',
+              'questions': value['questions'] ?? [],
+            });
+          }
         }
       });
     }
@@ -63,25 +104,65 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
 
   Future<void> _addQuiz(dynamic quizData) async {
     final date = DateTime.now().toString().substring(0, 10);
+    final unitName = quizData is Map && quizData['unit'] != null ? quizData['unit'] : 'Unit 1';
     final newQuiz = {
       'title': quizData is String ? quizData : quizData['title'],
       'date': date,
+      'unit': unitName,
       'questions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
+      'facultyQuestions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
+      'duration': '15 min',
+      'totalMarks': quizData is Map && quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
     };
-    final newRef = _quizRef.push();
+    
+    // Store quiz under the specific unit
+    final unitRef = _quizRef.child(unitName.replaceAll(' ', '_'));
+    final newRef = unitRef.push();
     await newRef.set(newQuiz);
     setState(() {
-      previousQuizzes.add({'key': newRef.key, 'title': newQuiz['title'], 'date': date, 'questions': newQuiz['questions']});
+      previousQuizzes.add({'key': newRef.key, 'title': newQuiz['title'], 'date': date, 'unit': unitName, 'questions': newQuiz['questions']});
     });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz added to $unitName!')));
   }
 
-  Future<void> _editQuiz(String key, dynamic quizData) async {
+  Future<void> _editQuiz(String key, String originalUnit, dynamic quizData) async {
+    final newUnitName = quizData['unit'] ?? 'Unit 1';
+    final originalUnitName = originalUnit;
+    
     final updatedQuiz = {
       'title': quizData['title'],
       'date': quizData['date'] ?? DateTime.now().toString().substring(0, 10),
+      'unit': newUnitName,
       'questions': quizData['questions'] ?? [],
+      'facultyQuestions': quizData['questions'] ?? [],
+      'duration': '15 min',
+      'totalMarks': quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
     };
-    await _quizRef.child(key).set(updatedQuiz);
+    
+    // If unit has changed, we need to move the quiz
+    if (originalUnitName != newUnitName) {
+      // Delete from original unit
+      final originalUnitRef = _quizRef.child(originalUnitName.replaceAll(' ', '_'));
+      await originalUnitRef.child(key).remove();
+      
+      // Add to new unit with new key
+      final newUnitRef = _quizRef.child(newUnitName.replaceAll(' ', '_'));
+      final newRef = newUnitRef.push();
+      await newRef.set(updatedQuiz);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Quiz moved from $originalUnitName to $newUnitName!'))
+      );
+    } else {
+      // Update in the same unit
+      final unitRef = _quizRef.child(newUnitName.replaceAll(' ', '_'));
+      await unitRef.child(key).set(updatedQuiz);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Quiz updated in $newUnitName!'))
+      );
+    }
+    
     await _loadQuizzes();
   }
 
@@ -90,7 +171,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     final subject = widget.subject;
     return Scaffold(
       appBar: AppBar(
-        title: Text("Quizzes - \\${subject['label']}"),
+        title: Text("Quizzes - ${subject['label']}"),
         backgroundColor: subject['color'],
       ),
       body: Padding(
@@ -129,7 +210,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                         icon: Icon(Icons.upload_file),
                         label: Text("Upload Quiz Document"),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -138,88 +219,68 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                         onPressed: () async {
                           FilePickerResult? result = await FilePicker.platform.pickFiles(
                             type: FileType.custom,
-                            allowedExtensions: ['xlsx'],
+                            allowedExtensions: ['xlsx', 'xls'],
                           );
+
                           if (result != null) {
-                            String ext = result.files.single.extension ?? '';
-                            List<Map<String, dynamic>> questions = [];
-                            // Use file name (without extension) as quiz title
-                            String quizTitle = result.files.single.name;
-                            if (quizTitle.contains('.')) {
-                              quizTitle = quizTitle.substring(0, quizTitle.lastIndexOf('.'));
-                            }
-                            if (ext == 'xlsx') {
-                              List<int>? bytes;
-                              if (result.files.single.bytes != null) {
-                                // Web: use bytes directly
-                                bytes = result.files.single.bytes;
-                              } else if (result.files.single.path != null) {
-                                // Mobile/Desktop: read from file
-                                bytes = File(result.files.single.path!).readAsBytesSync();
-                              }
-                              if (bytes != null) {
-                                final excel = Excel.decodeBytes(bytes);
-                                // Assumes first sheet, first row is header: Question, OptionA, OptionB, OptionC, OptionD, Answer
-                                final sheet = excel.tables.values.first;
-                                if (sheet != null && sheet.maxRows > 1) {
-                                  for (int i = 1; i < sheet.maxRows; i++) {
-                                    final row = sheet.row(i);
-                                    if (row.length >= 6) {
-                                      final questionText = row[0]?.value?.toString().trim() ?? '';
-                                      final optionA = row[1]?.value?.toString().trim() ?? '';
-                                      final optionB = row[2]?.value?.toString().trim() ?? '';
-                                      final optionC = row[3]?.value?.toString().trim() ?? '';
-                                      final optionD = row[4]?.value?.toString().trim() ?? '';
-                                      final answer = row[5]?.value?.toString().trim() ?? '';
-                                      if (questionText.isNotEmpty && optionA.isNotEmpty && optionB.isNotEmpty && optionC.isNotEmpty && optionD.isNotEmpty && answer.isNotEmpty) {
-                                        // Map answer letter to index
-                                        int? correctIdx;
-                                        switch (answer.toUpperCase()) {
-                                          case 'A':
-                                            correctIdx = 0;
-                                            break;
-                                          case 'B':
-                                            correctIdx = 1;
-                                            break;
-                                          case 'C':
-                                            correctIdx = 2;
-                                            break;
-                                          case 'D':
-                                            correctIdx = 3;
-                                            break;
-                                        }
-                                        if (correctIdx != null) {
-                                          final q = {
-                                            'question': questionText,
-                                            'options': [optionA, optionB, optionC, optionD],
-                                            'correct': correctIdx,
-                                          };
-                                          questions.add(q);
-                                          print('Parsed question: ' + q.toString());
-                                        } else {
-                                          print('Skipped row at index $i due to invalid answer value: $answer');
-                                        }
-                                      } else {
-                                        print('Skipped row at index $i due to missing data.');
-                                      }
+                            try {
+                              final file = File(result.files.single.path!);
+                              final bytes = await file.readAsBytes();
+                              final excel = Excel.decodeBytes(bytes);
+                              
+                              List<Map<String, dynamic>> questions = [];
+                              
+                              for (var table in excel.tables.keys) {
+                                var sheet = excel.tables[table]!;
+                                bool isHeaderRow = true;
+                                
+                                for (var row in sheet.rows) {
+                                  if (isHeaderRow) {
+                                    isHeaderRow = false;
+                                    continue;
+                                  }
+                                  
+                                  if (row.length >= 6 && row[0]?.value != null) {
+                                    String question = row[0]?.value?.toString() ?? '';
+                                    List<String> options = [
+                                      row[1]?.value?.toString() ?? '',
+                                      row[2]?.value?.toString() ?? '',
+                                      row[3]?.value?.toString() ?? '',
+                                      row[4]?.value?.toString() ?? '',
+                                    ];
+                                    int correct = int.tryParse(row[5]?.value?.toString() ?? '0') ?? 0;
+                                    
+                                    if (question.isNotEmpty && options.any((opt) => opt.isNotEmpty)) {
+                                      questions.add({
+                                        'question': question,
+                                        'options': options,
+                                        'correct': correct - 1, // Convert 1-based to 0-based
+                                      });
                                     }
                                   }
-                                } else {
-                                  print('Excel sheet is empty or only header present.');
                                 }
-                                print('Total questions parsed: ' + questions.length.toString());
-                              } else {
-                                print('No bytes found for Excel file.');
                               }
-                            }
-                            // If questions found, add quiz
-                            if (questions.isNotEmpty) {
-                              print('Adding quiz with ${questions.length} questions.');
-                              await _addQuiz({'title': quizTitle, 'questions': questions});
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz created from Excel file!')));
-                            } else {
-                              print('No questions parsed from Excel file.');
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not parse any questions from the Excel file.')));
+                              
+                              if (questions.isNotEmpty) {
+                                // Use file name (without extension) as quiz title
+                                String quizTitle = result.files.single.name;
+                                if (quizTitle.contains('.')) {
+                                  quizTitle = quizTitle.substring(0, quizTitle.lastIndexOf('.'));
+                                }
+                                
+                                await _addQuiz({'title': quizTitle, 'questions': questions});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Quiz uploaded successfully with ${questions.length} questions!')),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('No valid questions found in the uploaded file.')),
+                                );
+                              }
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error processing file: $e')),
+                              );
                             }
                           }
                         },
@@ -228,13 +289,22 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                   ),
                   SizedBox(height: 24),
                   Text(
-                    "Previous Quizzes",
+                    "Previous Quizzes:",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
-                  SizedBox(height: 12),
+                  SizedBox(height: 16),
                   Expanded(
                     child: previousQuizzes.isEmpty
-                        ? Text("No quizzes created yet.")
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.quiz, size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text("No quizzes created yet", style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          )
                         : ListView.builder(
                             itemCount: previousQuizzes.length,
                             itemBuilder: (context, index) {
@@ -243,7 +313,13 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                 child: ListTile(
                                   leading: Icon(Icons.quiz, color: subject['color']),
                                   title: Text(quiz['title'] ?? ''),
-                                  subtitle: Text("Date: \\${quiz['date']}"),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text("Unit: ${quiz['unit'] ?? 'Unit 1'}"),
+                                      Text("Date: ${quiz['date']}"),
+                                    ],
+                                  ),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -259,12 +335,10 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                                   .map((q) => Map<String, dynamic>.from(q as Map))
                                                   .toList();
                                             } else if (quiz['questions'] is Map) {
-                                              // In case questions are stored as a map (shouldn't happen, but for safety)
-                                              questionsList = (quiz['questions'] as Map).values
-                                                  .map((q) => Map<String, dynamic>.from(q as Map))
-                                                  .toList();
+                                              questionsList = [Map<String, dynamic>.from(quiz['questions'] as Map)];
                                             }
                                           }
+
                                           final result = await Navigator.push(
                                             context,
                                             MaterialPageRoute(
@@ -275,12 +349,8 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                               ),
                                             ),
                                           );
-                                          if (result != null && result is Map && result['title'] != null && result['title'].toString().isNotEmpty) {
-                                            await _editQuiz(quiz['key'], {
-                                              'title': result['title'],
-                                              'date': quiz['date'],
-                                              'questions': result['questions'],
-                                            });
+                                          if (result != null) {
+                                            await _editQuiz(quiz['key'], quiz['originalUnit'] ?? quiz['unit'], result);
                                           }
                                         },
                                       ),
@@ -292,30 +362,20 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                             context: context,
                                             builder: (ctx) => AlertDialog(
                                               title: Text('Delete Quiz'),
-                                              content: Text('Are you sure you want to delete this quiz?'),
+                                              content: Text('Are you sure you want to delete "${quiz['title']}"?'),
                                               actions: [
-                                                TextButton(
-                                                  child: Text('Cancel'),
-                                                  onPressed: () => Navigator.pop(ctx, false),
-                                                ),
-                                                ElevatedButton(
-                                                  child: Text('Delete'),
-                                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                                                  onPressed: () => Navigator.pop(ctx, true),
-                                                ),
+                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
+                                                TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Delete')),
                                               ],
                                             ),
                                           );
                                           if (confirm == true) {
-                                            await _deleteQuiz(quiz['key']);
+                                            await _deleteQuiz(quiz['key'], quiz['unit']);
                                           }
                                         },
                                       ),
                                     ],
                                   ),
-                                  onTap: () {
-                                    // Optionally, view quiz details or results
-                                  },
                                 ),
                               );
                             },
@@ -341,12 +401,25 @@ class QuizCreationForm extends StatefulWidget {
 class _QuizCreationFormState extends State<QuizCreationForm> {
   final _formKey = GlobalKey<FormState>();
   String quizTitle = "";
+  String? selectedUnit;
+  List<String> availableUnits = [];
   List<Map<String, dynamic>> questions = [];
 
   @override
   void initState() {
     super.initState();
     quizTitle = widget.initialTitle ?? "";
+    
+    // Initialize available units from subject data
+    if (widget.subject['units'] != null) {
+      availableUnits = (widget.subject['units'] as List<dynamic>)
+          .map((unit) => unit['name'] as String)
+          .toList();
+    } else {
+      // Default units if no units are defined
+      availableUnits = ['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4'];
+    }
+    
     questions = widget.initialQuestions != null
         ? widget.initialQuestions!.map((q) => {
               'question': q['question'] ?? '',
@@ -378,7 +451,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
     final subject = widget.subject;
     return Scaffold(
       appBar: AppBar(
-        title: Text("Create Quiz - \\${subject['label']}"),
+        title: Text("Create Quiz - ${subject['label']}"),
         backgroundColor: subject['color'],
       ),
       body: Padding(
@@ -400,6 +473,27 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                   onSaved: (value) => quizTitle = value ?? "",
                   onChanged: (value) => quizTitle = value,
                 ),
+                SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    labelText: "Select Unit",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.folder_outlined),
+                  ),
+                  value: selectedUnit,
+                  items: availableUnits.map((String unit) {
+                    return DropdownMenuItem<String>(
+                      value: unit,
+                      child: Text(unit),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      selectedUnit = newValue;
+                    });
+                  },
+                  validator: (value) => value == null ? "Please select a unit" : null,
+                ),
                 SizedBox(height: 24),
                 Text(
                   "Questions:",
@@ -417,7 +511,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                         children: [
                           TextFormField(
                             decoration: InputDecoration(
-                              labelText: "Question \\${qIndex + 1}",
+                              labelText: "Question ${qIndex + 1}",
                               border: OutlineInputBorder(),
                             ),
                             initialValue: q['question'],
@@ -441,7 +535,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                                     Expanded(
                                       child: TextFormField(
                                         decoration: InputDecoration(
-                                          labelText: "Option \\${optIdx + 1}",
+                                          labelText: "Option ${optIdx + 1}",
                                           border: OutlineInputBorder(),
                                         ),
                                         initialValue: q['options'][optIdx],
@@ -449,28 +543,46 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                                         onChanged: (value) => questions[qIndex]['options'][optIdx] = value,
                                       ),
                                     ),
-                                    if ((q['correct'] ?? -1) == optIdx)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 8.0),
-                                        child: Text("Correct", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                    if (q['correct'] == optIdx)
+                                      Container(
+                                        margin: EdgeInsets.only(left: 8),
+                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text("Correct", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                       ),
                                   ],
                                 ),
                               )),
                           if (q['correct'] == null)
                             Padding(
-                              padding: const EdgeInsets.only(top: 4.0),
+                              padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                "Select the correct answer.",
+                                "Please select the correct answer",
                                 style: TextStyle(color: Colors.red, fontSize: 12),
                               ),
                             ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  setState(() {
+                                    questions.removeAt(qIndex);
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
                   );
-                }),
-                SizedBox(height: 12),
+                }).toList(),
+                SizedBox(height: 16),
                 Row(
                   children: [
                     ElevatedButton.icon(
@@ -506,10 +618,17 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                         );
                         return;
                       }
-                      // Return a map with title and questions
+                      if (selectedUnit == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Please select a unit for this quiz.')),
+                        );
+                        return;
+                      }
+                      // Return a map with title, questions, and unit
                       Navigator.pop(context, {
                         'title': quizTitle,
                         'questions': questions,
+                        'unit': selectedUnit,
                       });
                     }
                   },

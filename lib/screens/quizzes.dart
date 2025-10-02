@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/subject_detail.dart';
+import 'package:stela_app/services/quiz_service.dart';
 
 /// Clean, single-file quizzes implementation.
 /// Exposes `QuizzesScreen` as the main entry point for the Quizzes route.
@@ -16,6 +17,9 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   String _selectedCategory = 'All';
+  final QuizService _quizService = QuizService();
+  Map<String, List<Map<String, dynamic>>> _facultyQuizzes = {};
+  bool _loadingFacultyQuizzes = true;
 
   final List<Map<String, dynamic>> subjects = const [
     {
@@ -510,6 +514,22 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+    _loadFacultyQuizzes();
+  }
+
+  Future<void> _loadFacultyQuizzes() async {
+    try {
+      final facultyQuizzes = await _quizService.getAllQuizzes();
+      setState(() {
+        _facultyQuizzes = facultyQuizzes;
+        _loadingFacultyQuizzes = false;
+      });
+    } catch (e) {
+      print('Error loading faculty quizzes: $e');
+      setState(() {
+        _loadingFacultyQuizzes = false;
+      });
+    }
   }
 
   @override
@@ -519,8 +539,86 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
   }
 
   List<Map<String, dynamic>> get filteredSubjects {
-    if (_selectedCategory == 'All') return subjects;
-    return subjects.where((subject) => subject['category'] == _selectedCategory).toList();
+    List<Map<String, dynamic>> updatedSubjects = _mergeWithFacultyQuizzes();
+    if (_selectedCategory == 'All') return updatedSubjects;
+    return updatedSubjects.where((subject) => subject['category'] == _selectedCategory).toList();
+  }
+
+  List<Map<String, dynamic>> _mergeWithFacultyQuizzes() {
+    List<Map<String, dynamic>> updatedSubjects = [];
+    
+    for (var subject in subjects) {
+      Map<String, dynamic> updatedSubject = Map<String, dynamic>.from(subject);
+      String subjectId = subject['id'];
+      
+      // Get faculty quizzes for this subject
+      List<Map<String, dynamic>> facultyQuizzes = _facultyQuizzes[subjectId] ?? [];
+      
+      if (facultyQuizzes.isNotEmpty) {
+        // Create a deep copy of units to make them modifiable
+        List<Map<String, dynamic>> units = [];
+        for (var unit in (updatedSubject['units'] ?? [])) {
+          units.add(Map<String, dynamic>.from(unit));
+        }
+        
+        // Group faculty quizzes by unit
+        Map<String, List<Map<String, dynamic>>> quizzesByUnit = {};
+        for (var quiz in facultyQuizzes) {
+          String unitName = quiz['unit'] ?? 'Unit 1';
+          if (!quizzesByUnit.containsKey(unitName)) {
+            quizzesByUnit[unitName] = [];
+          }
+          
+          // Convert to expected format
+          quizzesByUnit[unitName]!.add({
+            'name': quiz['title'],
+            'title': quiz['title'],
+            'questions': quiz['questions']?.length ?? 0,
+            'duration': quiz['duration'],
+            'id': quiz['id'],
+            'isFromFaculty': true,
+            'date': quiz['date'],
+            'unit': quiz['unit'],
+            'facultyQuestions': quiz['questions'], // Store full question data
+          });
+        }
+        
+        // Merge faculty quizzes into existing units
+        for (int i = 0; i < units.length; i++) {
+          String unitName = units[i]['name'];
+          if (quizzesByUnit.containsKey(unitName)) {
+            // Add faculty quizzes to existing unit
+            List<dynamic> existingQuizzes = List<dynamic>.from(units[i]['quizzes'] ?? []);
+            existingQuizzes.addAll(quizzesByUnit[unitName]!);
+            units[i]['quizzes'] = existingQuizzes;
+            
+            // Remove from the map since we've processed it
+            quizzesByUnit.remove(unitName);
+          }
+        }
+        
+        // Create new units for any remaining faculty quizzes that don't match existing units
+        quizzesByUnit.forEach((unitName, quizzes) {
+          units.add({
+            'name': unitName,
+            'topics': ['Faculty Created Content'],
+            'quizzes': quizzes,
+            'isFacultyUnit': true,
+          });
+        });
+        
+        updatedSubject['units'] = units;
+      }
+      
+      updatedSubjects.add(updatedSubject);
+    }
+    
+    return updatedSubjects;
+  }
+
+  bool _hasFacultyQuizzes(Map<String, dynamic> subject) {
+    String subjectId = subject['id'];
+    return _facultyQuizzes[subjectId]?.isNotEmpty ?? false;
   }
 
   @override
@@ -676,25 +774,49 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
             ),
           ),
           
-          // Subjects Grid
-          SliverPadding(
-            padding: EdgeInsets.all(16),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: childAspectRatio,
+          // Subjects Grid with Loading State
+          _loadingFacultyQuizzes 
+            ? SliverToBoxAdapter(
+                child: Container(
+                  height: 200,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(primaryButton),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Loading faculty quizzes...',
+                          style: TextStyle(
+                            color: primaryBar.withOpacity(0.7),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : SliverPadding(
+                padding: EdgeInsets.all(16),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: childAspectRatio,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final subject = filteredSubjects[index];
+                      return _buildSubjectCard(context, subject, index);
+                    },
+                    childCount: filteredSubjects.length,
+                  ),
+                ),
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final subject = filteredSubjects[index];
-                  return _buildSubjectCard(context, subject, index);
-                },
-                childCount: filteredSubjects.length,
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -768,13 +890,36 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
                         overflow: TextOverflow.ellipsis,
                       ),
                       SizedBox(height: 2),
-                      Text(
-                        subject['category'],
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: primaryBar.withOpacity(0.6),
-                          fontFamily: 'PTSerif',
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            subject['category'],
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: primaryBar.withOpacity(0.6),
+                              fontFamily: 'PTSerif',
+                            ),
+                          ),
+                          // Show faculty quiz indicator
+                          if (_hasFacultyQuizzes(subject)) ...[
+                            SizedBox(width: 8),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Faculty Quizzes',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: Colors.orange[800],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),

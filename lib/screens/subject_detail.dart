@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
+import 'package:stela_app/screens/faculty_quiz_taking_screen.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
   final Map<String, dynamic> subject;
@@ -806,6 +807,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
   }
 
   void _showQuizDetails(BuildContext context, Map<String, dynamic> quiz) {
+    bool isFacultyQuiz = quiz['isFromFaculty'] == true;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -830,7 +833,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // Header with faculty indicator
               Row(
                 children: [
                   Container(
@@ -855,7 +858,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                       ],
                     ),
                     child: Icon(
-                      Icons.quiz,
+                      isFacultyQuiz ? Icons.school : Icons.quiz,
                       color: Colors.white,
                       size: 24,
                     ),
@@ -875,14 +878,46 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                           ),
                         ),
                         SizedBox(height: 4),
-                        Text(
-                          quiz['name'],
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: widget.subject['color'],
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            if (isFacultyQuiz) ...[
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Faculty Created',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.orange[800],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                            ],
+                            Text(
+                              quiz['name'] ?? quiz['title'],
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: widget.subject['color'],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
+                        if (isFacultyQuiz && quiz['date'] != null) ...[
+                          SizedBox(height: 2),
+                          Text(
+                            'Created: ${quiz['date']}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: primaryBar.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1001,28 +1036,44 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                Icon(Icons.info_outline, color: Colors.white, size: 20),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Quiz functionality coming soon!',
-                                    style: TextStyle(fontWeight: FontWeight.w600),
+                        if (isFacultyQuiz && quiz['facultyQuestions'] != null && (quiz['facultyQuestions'] as List).isNotEmpty) {
+                          // Start faculty quiz with actual questions
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FacultyQuizTakingScreen(
+                                quiz: quiz,
+                                subject: widget.subject,
+                              ),
+                            ),
+                          );
+                        } else {
+                          // Show coming soon for static quizzes
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: Colors.white, size: 20),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      isFacultyQuiz 
+                                        ? 'No questions available for this quiz yet.'
+                                        : 'Quiz functionality coming soon!',
+                                      style: TextStyle(fontWeight: FontWeight.w600),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                              backgroundColor: widget.subject['color'],
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              margin: EdgeInsets.all(16),
                             ),
-                            backgroundColor: widget.subject['color'],
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            margin: EdgeInsets.all(16),
-                          ),
-                        );
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: widget.subject['color'],
