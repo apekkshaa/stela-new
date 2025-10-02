@@ -20,28 +20,78 @@ class FacultyQuizManage extends StatefulWidget {
 
 class _FacultyQuizManageState extends State<FacultyQuizManage> {
   Future<void> _deleteQuiz(String key, String? unitName) async {
-    if (unitName != null) {
-      // Delete from specific unit
-      final unitRef = _quizRef.child(unitName.replaceAll(' ', '_'));
-      await unitRef.child(key).remove();
-    } else {
-      // Fallback: try to find and delete from any unit
-      final snapshot = await _quizRef.get();
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
-        for (var unitKey in data.keys) {
-          if (data[unitKey] is Map) {
-            final unitData = data[unitKey] as Map<dynamic, dynamic>;
-            if (unitData.containsKey(key)) {
-              await _quizRef.child(unitKey).child(key).remove();
-              break;
+    try {
+      bool deleted = false;
+      print('Debug: Attempting to delete quiz with key="$key", unitName="$unitName"');
+      
+      if (unitName != null) {
+        // Try to delete from specific unit first (new structure)
+        final unitRef = _quizRef.child(unitName.replaceAll(' ', '_'));
+        final unitSnapshot = await unitRef.child(key).get();
+        print('Debug: Checking unit path: ${unitRef.child(key).path}, exists: ${unitSnapshot.exists}');
+        if (unitSnapshot.exists) {
+          await unitRef.child(key).remove();
+          print('Debug: Successfully deleted from unit structure');
+          deleted = true;
+        }
+      }
+      
+      if (!deleted) {
+        print('Debug: Unit deletion failed, trying fallback search');
+        // Fallback: search through all possible locations
+        final snapshot = await _quizRef.get();
+        if (snapshot.exists) {
+          final data = snapshot.value as Map<dynamic, dynamic>;
+          print('Debug: Firebase root keys: ${data.keys.toList()}');
+          
+          // First, try to find in unit-based structure
+          for (var unitKey in data.keys) {
+            if (data[unitKey] is Map) {
+              final unitData = data[unitKey] as Map<dynamic, dynamic>;
+              print('Debug: Checking unit "$unitKey" with keys: ${unitData.keys.toList()}');
+              if (unitData.containsKey(key)) {
+                await _quizRef.child(unitKey).child(key).remove();
+                print('Debug: Successfully deleted from unit "$unitKey"');
+                deleted = true;
+                break;
+              }
             }
+          }
+          
+          // If still not found, try direct quiz structure (old format)
+          if (!deleted && data.containsKey(key)) {
+            print('Debug: Found quiz in direct structure, deleting');
+            await _quizRef.child(key).remove();
+            deleted = true;
           }
         }
       }
+      
+      if (deleted) {
+        await _loadQuizzes();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Quiz deleted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Quiz not found or already deleted.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error deleting quiz: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting quiz: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-    await _loadQuizzes();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz deleted!')));
   }
   List<Map<String, dynamic>> previousQuizzes = [];
   late DatabaseReference _quizRef;
@@ -475,6 +525,8 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                             ),
                                           );
                                           if (confirm == true) {
+                                            print('Debug: Deleting quiz with key="${quiz['key']}", unit="${quiz['unit']}"');
+                                            print('Debug: Quiz data = $quiz');
                                             await _deleteQuiz(quiz['key'], quiz['unit']);
                                           }
                                         },
