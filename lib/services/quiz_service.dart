@@ -24,18 +24,25 @@ class QuizService {
     
     // Map student subject IDs to faculty subject labels
     final String subjectKey = _mapSubjectIdToFacultyKey(subjectId);
+    print('QuizService: Mapping subject ID "$subjectId" to Firebase key "$subjectKey"');
     
     try {
       final snapshot = await _quizzesRef.child(subjectKey).get();
       List<Map<String, dynamic>> quizzes = [];
       
+      print('QuizService: Firebase snapshot exists: ${snapshot.exists}');
+      
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
+        print('QuizService: Firebase data keys: ${data.keys.toList()}');
+        
         data.forEach((unitKey, unitValue) {
+          print('QuizService: Processing unit "$unitKey"');
           if (unitValue is Map) {
             // Check if this is a unit containing quizzes
             unitValue.forEach((quizKey, quizValue) {
               if (quizValue is Map && quizValue.containsKey('title')) {
+                print('QuizService: Found quiz "${quizValue['title']}" in unit "$unitKey"');
                 quizzes.add({
                   'id': quizKey,
                   'title': quizValue['title']?.toString() ?? '',
@@ -52,6 +59,7 @@ class QuizService {
             // Also handle backward compatibility for direct quizzes (not in units)
             if (unitValue.containsKey('title') && !unitValue.containsKey('questions')) {
               // This is a direct quiz, not a unit
+              print('QuizService: Found direct quiz "${unitValue['title']}"');
               quizzes.add({
                 'id': unitKey,
                 'title': unitValue['title']?.toString() ?? '',
@@ -65,8 +73,11 @@ class QuizService {
             }
           }
         });
+      } else {
+        print('QuizService: No data found in Firebase for key "$subjectKey"');
       }
       
+      print('QuizService: Returning ${quizzes.length} quizzes');
       return quizzes;
     } catch (e) {
       print('Error fetching quizzes for subject $subjectId: $e');
@@ -80,16 +91,16 @@ class QuizService {
     
     Map<String, List<Map<String, dynamic>>> allQuizzes = {};
     
-    // Define subject mappings
+    // Define subject mappings using the actual subject IDs from the student portal
     final Map<String, String> subjectMappings = {
-      'aipt': 'Artificial_Intelligence_-_Programming_Tools',
-      'cloud': 'Cloud_Computing',
-      'compiler': 'Compiler_Design',
-      'networks': 'Computer_Networks',
-      'coa': 'Computer_Organization_and_Architecture',
-      'ml': 'Machine_Learning',
-      'wireless': 'Wireless_Networks',
-      'iot': 'Internet_of_Things',
+      'artificial_intelligence_programming_tools': 'Artificial_Intelligence_-_Programming_Tools',
+      'cloud_computing': 'Cloud_Computing',
+      'compiler_design': 'Compiler_Design',
+      'computer_networks': 'Computer_Networks',
+      'computer_organization_and_architecture': 'Computer_Organization_and_Architecture',
+      'machine_learning': 'Machine_Learning',
+      'wireless_networks': 'Wireless_Networks',
+      'internet_of_things': 'Internet_of_Things',
       'c_programming': 'C_Programming',
     };
     
@@ -104,13 +115,21 @@ class QuizService {
   String _mapSubjectIdToFacultyKey(String subjectId) {
     final Map<String, String> mappings = {
       'aipt': 'Artificial_Intelligence_-_Programming_Tools',
+      'artificial_intelligence_programming_tools': 'Artificial_Intelligence_-_Programming_Tools',
       'cloud': 'Cloud_Computing',
+      'cloud_computing': 'Cloud_Computing',
       'compiler': 'Compiler_Design',
+      'compiler_design': 'Compiler_Design',
       'networks': 'Computer_Networks',
+      'computer_networks': 'Computer_Networks',
       'coa': 'Computer_Organization_and_Architecture',
+      'computer_organization_and_architecture': 'Computer_Organization_and_Architecture',
       'ml': 'Machine_Learning',
+      'machine_learning': 'Machine_Learning',
       'wireless': 'Wireless_Networks',
+      'wireless_networks': 'Wireless_Networks',
       'iot': 'Internet_of_Things',
+      'internet_of_things': 'Internet_of_Things',
       'c_programming': 'C_Programming',
     };
     

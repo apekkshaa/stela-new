@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/faculty_quiz_taking_screen.dart';
+import '../services/quiz_service.dart';
 
 class SubjectDetailScreen extends StatefulWidget {
   final Map<String, dynamic> subject;
@@ -15,6 +16,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  final QuizService _quizService = QuizService();
+  
+  Map<String, dynamic>? _subjectWithFacultyQuizzes;
+  bool _loadingFacultyQuizzes = true;
 
   @override
   void initState() {
@@ -27,6 +32,90 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+    _loadFacultyQuizzesForSubject();
+  }
+
+  Future<void> _loadFacultyQuizzesForSubject() async {
+    try {
+      String subjectId = widget.subject['id'];
+      print('Loading faculty quizzes for subject ID: $subjectId');
+      
+      List<Map<String, dynamic>> facultyQuizzes = await _quizService.getQuizzesForSubject(subjectId);
+      print('Retrieved ${facultyQuizzes.length} faculty quizzes');
+      
+      // Create a copy of the subject and merge faculty quizzes
+      Map<String, dynamic> updatedSubject = Map<String, dynamic>.from(widget.subject);
+      List<Map<String, dynamic>> units = [];
+      
+      // Initialize units with clean structure
+      for (var unit in (updatedSubject['units'] ?? [])) {
+        Map<String, dynamic> cleanUnit = {
+          'name': unit['name'],
+          'topics': unit['topics'],
+          'quizzes': [], // Start with empty quizzes
+        };
+        units.add(cleanUnit);
+      }
+      
+      // Group faculty quizzes by unit
+      Map<String, List<Map<String, dynamic>>> quizzesByUnit = {};
+      for (var quiz in facultyQuizzes) {
+        String unitName = quiz['unit'] ?? 'Unit 1';
+        print('Quiz "${quiz['title']}" assigned to unit: $unitName');
+        
+        if (!quizzesByUnit.containsKey(unitName)) {
+          quizzesByUnit[unitName] = [];
+        }
+        
+        quizzesByUnit[unitName]!.add({
+          'name': quiz['title'],
+          'title': quiz['title'],
+          'questions': quiz['questions']?.length ?? 0,
+          'duration': quiz['duration'],
+          'id': quiz['id'],
+          'isFromFaculty': true,
+          'date': quiz['date'],
+          'unit': quiz['unit'],
+          'facultyQuestions': quiz['questions'],
+        });
+      }
+      
+      print('Quizzes grouped by unit: ${quizzesByUnit.keys.toList()}');
+      
+      // Add faculty quizzes to corresponding units
+      for (int i = 0; i < units.length; i++) {
+        String unitName = units[i]['name'];
+        if (quizzesByUnit.containsKey(unitName)) {
+          units[i]['quizzes'] = quizzesByUnit[unitName]!;
+          print('Added ${quizzesByUnit[unitName]!.length} quizzes to $unitName');
+          quizzesByUnit.remove(unitName);
+        }
+      }
+      
+      // Add new units for faculty quizzes that don't match existing units
+      quizzesByUnit.forEach((unitName, quizzes) {
+        print('Creating new unit: $unitName with ${quizzes.length} quizzes');
+        units.add({
+          'name': unitName,
+          'topics': ['Faculty Created Content'],
+          'quizzes': quizzes,
+          'isFacultyUnit': true,
+        });
+      });
+      
+      updatedSubject['units'] = units;
+      
+      setState(() {
+        _subjectWithFacultyQuizzes = updatedSubject;
+        _loadingFacultyQuizzes = false;
+      });
+    } catch (e) {
+      print('Error loading faculty quizzes for subject: $e');
+      setState(() {
+        _subjectWithFacultyQuizzes = widget.subject;
+        _loadingFacultyQuizzes = false;
+      });
+    }
   }
 
   @override
@@ -37,7 +126,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   int _getTotalTopicsCount() {
     int totalTopics = 0;
-    final units = widget.subject['units'] as List<dynamic>;
+    final subject = _subjectWithFacultyQuizzes ?? widget.subject;
+    final units = subject['units'] as List<dynamic>;
     for (var unit in units) {
       final topics = unit['topics'] as List<dynamic>;
       totalTopics += topics.length;
@@ -47,7 +137,8 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   int _getTotalQuizzesCount() {
     int totalQuizzes = 0;
-    final units = widget.subject['units'] as List<dynamic>;
+    final subject = _subjectWithFacultyQuizzes ?? widget.subject;
+    final units = subject['units'] as List<dynamic>;
     for (var unit in units) {
       if (unit['quizzes'] != null) {
         final quizzes = unit['quizzes'] as List<dynamic>;
@@ -59,6 +150,32 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final currentSubject = _subjectWithFacultyQuizzes ?? widget.subject;
+    
+    if (_loadingFacultyQuizzes) {
+      return Scaffold(
+        backgroundColor: primaryWhite,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(widget.subject['color']),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Loading quizzes...',
+                style: TextStyle(
+                  color: primaryBar.withOpacity(0.7),
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     return Scaffold(
       backgroundColor: primaryWhite,
       body: CustomScrollView(
@@ -212,7 +329,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
                   SizedBox(height: 16),
                   Row(
                     children: [
-                      _buildInfoChip('4 Units', Icons.library_books, widget.subject['color']),
+                      _buildInfoChip('${currentSubject['units'].length} Units', Icons.library_books, widget.subject['color']),
                       SizedBox(width: 12),
                       _buildInfoChip('${_getTotalQuizzesCount()} Quizzes', Icons.quiz, widget.subject['color']),
                     ],
@@ -234,10 +351,10 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final unit = widget.subject['units'][index];
+                  final unit = currentSubject['units'][index];
                   return _buildUnitCard(context, unit, index);
                 },
-                childCount: widget.subject['units'].length,
+                childCount: currentSubject['units'].length,
               ),
             ),
           ),
