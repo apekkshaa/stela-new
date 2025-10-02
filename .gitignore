@@ -1,0 +1,88 @@
+
+# Build artifacts
+**/build/
+**/.cxx/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/build.ninja
+**/rules.ninja
+**/configure_fingerprint.bin
+**/metadata_generation_command.txt
+**/prefab_config.json
+**/symbol_folder_index.txt
+**/additional_project_files.txt
+**/android_gradle_build.json
+**/android_gradle_build_mini.json
+**/build_file_index.txt
+**/hash_key.txt
+**/TargetDirectories.txt
+**/cmake.check_cache
+**/.cmake/
+**/*.o
+**/*.bin
+
+# Flutter build artifacts
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.dill
+*.lock
+
+# macOS specific
+__MACOSX/
+.DS_Store
+
+# Android build artifacts
+**/android/app/.cxx/
+**/android/app/build/
+**/android/build/
+**/android/.gradle/
+# Do not ignore Gradle wrapper folder; needed for builds
+# (keep ignoring .gradle cache only)
+# **/android/gradle/
+**/android/local.properties
+
+# iOS build artifacts
+**/ios/build/
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# macOS build artifacts
+**/macos/build/
+**/macos/Pods/
+**/macos/.symlinks/
+**/macos/Flutter/App.framework
+**/macos/Flutter/Flutter.framework
+**/macos/Flutter/Flutter.podspec
+**/macos/Flutter/Generated.xcconfig
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/flutter_assets/
+**/macos/Flutter/flutter_export_environment.sh
+**/macos/ServiceDefinitions.json
+**/macos/Runner/GeneratedPluginRegistrant.*
+
+# Windows build artifacts
+**/windows/build/
+**/windows/flutter/ephemeral/
+
+# Linux build artifacts
+**/linux/build/
+**/linux/flutter/ephemeral/
+
+# Web build artifacts
+**/web/build/
+
+# Generated files
+**/generated_plugin_registrant.*
+# Track Firebase app id file for iOS/macOS auto-config
+# **/firebase_app_id_file.json
