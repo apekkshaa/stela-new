@@ -284,32 +284,32 @@ class _FacultySubjectPickerState extends State<FacultySubjectPicker> with Ticker
                 ),
                 SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        subject['title'],
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: primaryBar,
-                          fontFamily: 'PTSerif-Bold',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          (subject['title'] ?? subject['label'] ?? 'Untitled').toString(),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: primaryBar,
+                            fontFamily: 'PTSerif-Bold',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        subject['category'],
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: primaryBar.withOpacity(0.6),
-                          fontFamily: 'PTSerif',
+                        SizedBox(height: 2),
+                        Text(
+                          (subject['category'] ?? '').toString(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: primaryBar.withOpacity(0.6),
+                            fontFamily: 'PTSerif',
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),

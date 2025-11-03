@@ -271,7 +271,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     await _loadQuizzes();
   }
 
-  Future<void> _processExcelFile(FilePickerResult result) async {
+  Future<void> _processExcelFile(FilePickerResult result, {String? unitName}) async {
     try {
       print('Starting Excel file processing...');
       
@@ -372,7 +372,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       print('Parsed ${questions.length} questions from Excel');
       
       // Step 3: Process results
-      if (questions.isNotEmpty) {
+        if (questions.isNotEmpty) {
         // Use file name (without extension) as quiz title
         String quizTitle = result.files.single.name;
         if (quizTitle.contains('.')) {
@@ -382,8 +382,9 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
         print('Attempting to add quiz: $quizTitle');
         
         // Step 4: Save to Firebase
-        try {
-          await _addQuiz({'title': quizTitle, 'questions': questions});
+          try {
+          // Pass unitName through so uploaded quiz is stored under selected unit
+          await _addQuiz({'title': quizTitle, 'questions': questions, 'unit': unitName});
           print('Quiz added successfully to Firebase');
           
           if (mounted) {
@@ -429,156 +430,139 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                 children: [
                   Row(
                     children: [
-                      ElevatedButton.icon(
-                        icon: Icon(Icons.add),
-                        label: Text("Create New Quiz"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: subject['color'],
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => QuizCreationForm(subject: subject),
-                            ),
-                          );
-                          if (result != null && result is Map && result['title'] != null && result['title'].toString().isNotEmpty) {
-                            await _addQuiz(result);
-                          }
-                        },
-                      ),
-                      SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        icon: Icon(Icons.upload_file),
-                        label: Text("Upload Quiz Document"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: () async {
-                          try {
-                            FilePickerResult? result = await FilePicker.platform.pickFiles(
-                              type: FileType.custom,
-                              allowedExtensions: ['xlsx', 'xls'],
-                            );
-
-                            if (result != null) {
-                              await _processExcelFile(result);
-                            }
-                          } catch (e) {
-                            print('File picker error: $e');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error selecting file: ${e.toString()}')),
-                            );
-                          }
-                        },
-                      ),
+                  // Replace top-level buttons with a 4-unit panel below
+                      // (UI now shows units with create/upload inside each)
                     ],
                   ),
                   SizedBox(height: 24),
                   Text(
-                    "Previous Quizzes:",
+                    "Units",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
-                  SizedBox(height: 16),
-                  Expanded(
-                    child: previousQuizzes.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.quiz, size: 64, color: Colors.grey),
-                                SizedBox(height: 16),
-                                Text("No quizzes created yet", style: TextStyle(color: Colors.grey)),
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: previousQuizzes.length,
-                            itemBuilder: (context, index) {
-                              final quiz = previousQuizzes[index];
-                              return Card(
-                                child: ListTile(
-                                  leading: Icon(Icons.quiz, color: subject['color']),
-                                  title: Text(quiz['title'] ?? ''),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text("Unit: ${quiz['unit'] ?? 'Unit 1'}"),
-                                      Text("Date: ${quiz['date']}"),
-                                      Text("Duration: ${quiz['duration'] ?? '30 min'}", style: TextStyle(color: subject['color'], fontWeight: FontWeight.w500)),
-                                    ],
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: Icon(Icons.edit, color: Colors.blue),
-                                        tooltip: 'Edit Quiz',
-                                        onPressed: () async {
-                                          // Convert questions to List<Map<String, dynamic>>
-                                          List<Map<String, dynamic>> questionsList = [];
-                                          if (quiz['questions'] != null) {
-                                            if (quiz['questions'] is List) {
-                                              questionsList = (quiz['questions'] as List)
-                                                  .map((q) => Map<String, dynamic>.from(q as Map))
-                                                  .toList();
-                                            } else if (quiz['questions'] is Map) {
-                                              questionsList = [Map<String, dynamic>.from(quiz['questions'] as Map)];
-                                            }
-                                          }
+                  SizedBox(height: 12),
+                  // Determine units (ensure 4 units)
+                  Builder(builder: (ctx) {
+                    List<String> units;
+                    if (widget.subject['units'] != null) {
+                      units = (widget.subject['units'] as List<dynamic>).map((u) => u['name'].toString()).toList();
+                    } else {
+                      units = ['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4'];
+                    }
+                    // Ensure exactly 4 units
+                    while (units.length < 4) units.add('Unit ${units.length + 1}');
+                    if (units.length > 4) units = units.sublist(0, 4);
 
+                    // Group existing quizzes by unit
+                    Map<String, List<Map<String, dynamic>>> quizzesByUnit = {};
+                    for (var q in previousQuizzes) {
+                      final unitName = (q['unit'] ?? 'Unit 1').toString();
+                      quizzesByUnit.putIfAbsent(unitName, () => []).add(q);
+                    }
+
+                    return Expanded(
+                      child: GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: MediaQuery.of(context).size.width > 900 ? 2 : 1,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 3.2,
+                        ),
+                        itemCount: units.length,
+                        itemBuilder: (context, idx) {
+                          final unit = units[idx];
+                          final unitQuizzes = quizzesByUnit[unit] ?? [];
+                          return Card(
+                            elevation: 4,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(child: Text(unit, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                                      ElevatedButton.icon(
+                                        icon: Icon(Icons.add),
+                                        label: Text('Create Quiz'),
+                                        style: ElevatedButton.styleFrom(backgroundColor: subject['color']),
+                                        onPressed: () async {
                                           final result = await Navigator.push(
                                             context,
-                                            MaterialPageRoute(
-                                              builder: (_) => QuizCreationForm(
-                                                subject: subject,
-                                                initialTitle: quiz['title'],
-                                                initialQuestions: questionsList,
-                                                initialDuration: quiz['duration'] is int ? quiz['duration'] : (quiz['duration'] is String ? int.tryParse(quiz['duration']) : null),
-                                                initialPin: quiz['pin']?.toString() ?? '',
-                                              ),
-                                            ),
+                                            MaterialPageRoute(builder: (_) => QuizCreationForm(subject: subject, initialUnit: unit)),
                                           );
-                                          if (result != null) {
-                                            await _editQuiz(quiz['key'], quiz['originalUnit'] ?? quiz['unit'], result);
+                                          if (result != null && result is Map && result['title'] != null && result['title'].toString().isNotEmpty) {
+                                            await _addQuiz(result);
                                           }
                                         },
                                       ),
-                                      IconButton(
-                                        icon: Icon(Icons.delete, color: Colors.redAccent),
-                                        tooltip: 'Delete Quiz',
+                                      SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        icon: Icon(Icons.upload_file),
+                                        label: Text('Upload'),
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                                         onPressed: () async {
-                                          final confirm = await showDialog<bool>(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: Text('Delete Quiz'),
-                                              content: Text('Are you sure you want to delete "${quiz['title']}"?'),
-                                              actions: [
-                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
-                                                TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Delete')),
-                                              ],
-                                            ),
-                                          );
-                                          if (confirm == true) {
-                                            await _deleteQuiz(quiz['key'], quiz['unit']);
+                                          try {
+                                            FilePickerResult? result = await FilePicker.platform.pickFiles(
+                                              type: FileType.custom,
+                                              allowedExtensions: ['xlsx', 'xls'],
+                                            );
+                                            if (result != null) {
+                                              await _processExcelFile(result, unitName: unit);
+                                            }
+                                          } catch (e) {
+                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error selecting file: ${e.toString()}')));
                                           }
                                         },
                                       ),
                                     ],
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
+                                  SizedBox(height: 8),
+                                  Expanded(
+                                    child: unitQuizzes.isEmpty
+                                        ? Center(child: Text('No quizzes in this unit', style: TextStyle(color: Colors.grey)))
+                                        : ListView.builder(
+                                            itemCount: unitQuizzes.length,
+                                            itemBuilder: (c, i) {
+                                              final quiz = unitQuizzes[i];
+                                              return ListTile(
+                                                leading: Icon(Icons.quiz, color: subject['color']),
+                                                title: Text(quiz['title'] ?? ''),
+                                                subtitle: Text('Date: ${quiz['date'] ?? ''} | Duration: ${quiz['duration'] ?? ''}'),
+                                                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                                  IconButton(icon: Icon(Icons.edit, color: Colors.blue), onPressed: () async {
+                                                    // Prepare questions list
+                                                    List<Map<String, dynamic>> questionsList = [];
+                                                    if (quiz['questions'] != null) {
+                                                      if (quiz['questions'] is List) {
+                                                        questionsList = (quiz['questions'] as List).map((q) => Map<String, dynamic>.from(q as Map)).toList();
+                                                      } else if (quiz['questions'] is Map) {
+                                                        questionsList = [Map<String, dynamic>.from(quiz['questions'] as Map)];
+                                                      }
+                                                    }
+                                                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => QuizCreationForm(subject: subject, initialTitle: quiz['title'], initialQuestions: questionsList, initialDuration: quiz['duration'] is int ? quiz['duration'] : (quiz['duration'] is String ? int.tryParse(quiz['duration']) : null), initialPin: quiz['pin']?.toString() ?? '', initialUnit: quiz['unit'])));
+                                                    if (result != null) {
+                                                      await _editQuiz(quiz['key'], quiz['originalUnit'] ?? quiz['unit'], result);
+                                                    }
+                                                  }),
+                                                  IconButton(icon: Icon(Icons.delete, color: Colors.redAccent), onPressed: () async {
+                                                    final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: Text('Delete Quiz'), content: Text('Are you sure you want to delete "${quiz['title']}"?'), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Delete'))]));
+                                                    if (confirm == true) {
+                                                      await _deleteQuiz(quiz['key'], quiz['unit']);
+                                                    }
+                                                  })
+                                                ]),
+                                              );
+                                            },
+                                          ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }),
                 ],
               ),
       ),
@@ -592,7 +576,8 @@ class QuizCreationForm extends StatefulWidget {
   final List<Map<String, dynamic>>? initialQuestions;
   final int? initialDuration;
   final String? initialPin;
-  const QuizCreationForm({required this.subject, this.initialTitle, this.initialQuestions, this.initialDuration, this.initialPin});
+  final String? initialUnit;
+  const QuizCreationForm({required this.subject, this.initialTitle, this.initialQuestions, this.initialDuration, this.initialPin, this.initialUnit});
 
   @override
   _QuizCreationFormState createState() => _QuizCreationFormState();
@@ -631,6 +616,8 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
               'correct': q['correct'] is int ? q['correct'] : (q['correct'] is String ? int.tryParse(q['correct']) : null),
             }).toList()
         : [];
+    // Preselect unit if provided
+    selectedUnit = widget.initialUnit ?? selectedUnit;
   }
 
   void _addQuestion() {

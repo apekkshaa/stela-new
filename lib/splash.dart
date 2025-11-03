@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:animated_splash_screen/animated_splash_screen.dart';
 import 'package:stela_app/constants/colors.dart';
-import 'package:stela_app/screens/home.dart';
+import 'package:stela_app/screens/auth_gate.dart';
 import 'package:page_transition/page_transition.dart'; // Optional, for transition effect
 
 class Splash extends StatelessWidget {
@@ -31,7 +31,7 @@ class Splash extends StatelessWidget {
       ),
       splashIconSize: 250,
       backgroundColor: primaryWhite, // or Colors.black if using white text/logo
-      nextScreen: Home(),
+  nextScreen: AuthGate(),
       splashTransition: SplashTransition.fadeTransition,
       pageTransitionType: PageTransitionType.fade,
     );

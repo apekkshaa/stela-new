@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'faculty_create_assignment.dart';
 
 class FacultyAssignmentManage extends StatelessWidget {
   final Map<String, dynamic> subject;
@@ -33,7 +34,10 @@ class FacultyAssignmentManage extends StatelessWidget {
                 ),
               ),
               onPressed: () {
-                // TODO: Navigate to assignment creation form
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => FacultyCreateAssignment(preselectedSubject: subject)),
+                );
               },
             ),
             SizedBox(height: 24),

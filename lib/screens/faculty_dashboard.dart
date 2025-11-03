@@ -12,6 +12,9 @@ import 'package:stela_app/screens/faculty_submissions_manage.dart';
 import 'package:stela_app/screens/faculty_announcements_manage.dart';
 import 'package:stela_app/screens/faculty_progress_manage.dart';
 import 'package:stela_app/screens/subjects.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:stela_app/screens/home.dart';
 
 // Import your upload, assignment, quiz, etc. pages here
 
@@ -149,8 +152,20 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
   }
 
   void _logout() {
-    // Add your logout logic here
-    // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Login()));
+    // Sign out and navigate to landing page
+    FirebaseAuth.instance.signOut().then((_) async {
+      try {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.remove('userRole');
+      } catch (e) {
+        // ignore prefs errors
+      }
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => Home()),
+        (route) => false,
+      );
+    });
   }
 
   @override
