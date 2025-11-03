@@ -77,6 +77,7 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
           'date': quiz['date'],
           'unit': quiz['unit'],
           'facultyQuestions': quiz['questions'],
+          'instructions': quiz['instructions'] ?? '',
           'pin': quiz['pin'], // Add the PIN field
         });
       }
@@ -1043,6 +1044,29 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
               ),
               
               SizedBox(height: 24),
+
+              // Show instructions if provided by faculty
+              if (quiz['instructions'] != null && quiz['instructions'].toString().trim().isNotEmpty) ...[
+                Text(
+                  'Instructions',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryBar),
+                ),
+                SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: widget.subject['color'].withOpacity(0.08)),
+                  ),
+                  child: Text(
+                    quiz['instructions'].toString(),
+                    style: TextStyle(fontSize: 13, color: primaryBar.withOpacity(0.8)),
+                  ),
+                ),
+                SizedBox(height: 16),
+              ],
               
               // Quiz details
               Container(

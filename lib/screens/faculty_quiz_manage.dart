@@ -214,6 +214,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       'facultyQuestions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
       'duration': duration,
       'pin': pin,
+      'instructions': quizData is Map && quizData['instructions'] != null ? quizData['instructions'] : '',
       'totalMarks': quizData is Map && quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
     };
     
@@ -241,6 +242,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       'facultyQuestions': quizData['questions'] ?? [],
       'duration': duration,
       'pin': pin,
+      'instructions': quizData['instructions'] ?? '',
       'totalMarks': quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
     };
     
@@ -539,7 +541,22 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                                         questionsList = [Map<String, dynamic>.from(quiz['questions'] as Map)];
                                                       }
                                                     }
-                                                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => QuizCreationForm(subject: subject, initialTitle: quiz['title'], initialQuestions: questionsList, initialDuration: quiz['duration'] is int ? quiz['duration'] : (quiz['duration'] is String ? int.tryParse(quiz['duration']) : null), initialPin: quiz['pin']?.toString() ?? '', initialUnit: quiz['unit'])));
+                                                    final result = await Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (_) => QuizCreationForm(
+                                                          subject: subject,
+                                                          initialTitle: quiz['title'],
+                                                          initialQuestions: questionsList,
+                                                          initialDuration: quiz['duration'] is int
+                                                              ? quiz['duration']
+                                                              : (quiz['duration'] is String ? int.tryParse(quiz['duration']) : null),
+                                                          initialPin: quiz['pin']?.toString() ?? '',
+                                                          initialUnit: quiz['unit'],
+                                                          initialInstructions: quiz['instructions']?.toString() ?? '',
+                                                        ),
+                                                      ),
+                                                    );
                                                     if (result != null) {
                                                       await _editQuiz(quiz['key'], quiz['originalUnit'] ?? quiz['unit'], result);
                                                     }
@@ -577,7 +594,8 @@ class QuizCreationForm extends StatefulWidget {
   final int? initialDuration;
   final String? initialPin;
   final String? initialUnit;
-  const QuizCreationForm({required this.subject, this.initialTitle, this.initialQuestions, this.initialDuration, this.initialPin, this.initialUnit});
+  final String? initialInstructions;
+  const QuizCreationForm({required this.subject, this.initialTitle, this.initialQuestions, this.initialDuration, this.initialPin, this.initialUnit, this.initialInstructions});
 
   @override
   _QuizCreationFormState createState() => _QuizCreationFormState();
@@ -589,6 +607,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
   String? selectedUnit;
   int duration = 30; // Default 30 minutes
   String pin = ""; // 6-digit PIN
+  String instructions = "";
   List<String> availableUnits = [];
   List<Map<String, dynamic>> questions = [];
 
@@ -598,6 +617,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
     quizTitle = widget.initialTitle ?? "";
     duration = widget.initialDuration ?? 30;
     pin = widget.initialPin ?? "";
+  instructions = widget.initialInstructions ?? "";
     
     // Initialize available units from subject data
     if (widget.subject['units'] != null) {
@@ -760,6 +780,20 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                   "Questions:",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
+                SizedBox(height: 12),
+                // Instructions field
+                TextFormField(
+                  decoration: InputDecoration(
+                    labelText: "Instructions (shown to students)",
+                    hintText: "Enter any instructions or guidelines for this quiz",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.info_outline),
+                  ),
+                  initialValue: instructions,
+                  maxLines: 3,
+                  onChanged: (v) => instructions = v,
+                ),
+                SizedBox(height: 12),
                 ...questions.asMap().entries.map((entry) {
                   int qIndex = entry.key;
                   Map<String, dynamic> q = entry.value;
@@ -885,13 +919,14 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                         );
                         return;
                       }
-                      // Return a map with title, questions, unit, duration, and pin
+                      // Return a map with title, questions, unit, duration, pin, and instructions
                       Navigator.pop(context, {
                         'title': quizTitle,
                         'questions': questions,
                         'unit': selectedUnit,
                         'duration': duration,
                         'pin': pin,
+                        'instructions': instructions,
                       });
                     }
                   },
