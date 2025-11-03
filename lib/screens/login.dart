@@ -315,18 +315,37 @@ class _LoginState extends State<Login> {
       userUID = FirebaseAuth.instance.currentUser?.uid;
       print("📦 UID fetched: $userUID");
 
-      final doc = await FirebaseFirestore.instance
-          .collection('students')
-          .doc(userUID)
-          .get();
+      // Try to find the user document in students -> faculty -> admins
+      DocumentSnapshot? docSnapshot;
+      String? foundCollection;
 
-      if (!doc.exists) {
-        print("❌ Firestore doc does not exist for UID $userUID");
+      final studentDoc = await FirebaseFirestore.instance.collection('students').doc(userUID).get();
+      if (studentDoc.exists) {
+        docSnapshot = studentDoc;
+        foundCollection = 'students';
+      } else {
+        final facultyDoc = await FirebaseFirestore.instance.collection('faculty').doc(userUID).get();
+        if (facultyDoc.exists) {
+          docSnapshot = facultyDoc;
+          foundCollection = 'faculty';
+        } else {
+          final adminDoc = await FirebaseFirestore.instance.collection('admins').doc(userUID).get();
+          if (adminDoc.exists) {
+            docSnapshot = adminDoc;
+            foundCollection = 'admins';
+          }
+        }
+      }
+
+      if (docSnapshot == null || !docSnapshot.exists) {
+        print("❌ No user document found for UID $userUID in students/faculty/admins");
         throw Exception("No user document found.");
       }
 
-      role = doc['userRole'] ?? 'Student';
-      print("🟡 Role from Firestore: $role");
+      // Prefer explicit userRole stored in the document; fall back to collection inference
+      role = (docSnapshot.data() as Map<String, dynamic>?)?['userRole'] ??
+          (foundCollection == 'faculty' ? 'Faculty' : foundCollection == 'admins' ? 'Admin' : 'Student');
+      print("🟡 Role from Firestore ($foundCollection): $role");
 
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('userRole', role);
