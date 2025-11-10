@@ -7,7 +7,9 @@ import 'package:flutter/services.dart';
 
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/subjects.dart';
+import 'package:stela_app/screens/home.dart';
 import 'package:stela_app/screens/faculty_signup.dart';
+import 'package:stela_app/screens/faculty_dashboard.dart';
 
 class SignUp extends StatefulWidget {
   @override
@@ -68,7 +70,11 @@ class _SignUpState extends State<SignUp> with SingleTickerProviderStateMixin {
             backgroundColor: primaryBar,
             leading: IconButton(
               icon: Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => Home()),
+                (route) => false,
+              ),
             ),
           ),
           body: Center(
@@ -176,6 +182,14 @@ class _SignUpState extends State<SignUp> with SingleTickerProviderStateMixin {
           prefixIcon: Icons.person_outline,
           onChanged: (v) => _name = v,
           validator: (v) => v == null || v.trim().isEmpty ? 'Name required' : null,
+        ),
+        SizedBox(height: 12),
+        InputField(
+          hint: 'Phone Number',
+          prefixIcon: Icons.phone,
+          keyboard: TextInputType.phone,
+          onChanged: (v) => _contact = v,
+          validator: (v) => v == null || v.trim().isEmpty ? 'Contact required' : null,
         ),
         SizedBox(height: 12),
         // Enrollment with toggle
@@ -319,7 +333,15 @@ class _SignUpState extends State<SignUp> with SingleTickerProviderStateMixin {
         : SizedBox(
             height: 56,
             child: ElevatedButton(
-              onPressed: _submit,
+              onPressed: () async {
+                // Immediate UI feedback to confirm button press
+                try {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Signing up...')));
+                } catch (e) {
+                  // ignore if scaffold not ready
+                }
+                await _submit();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryButton,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -331,6 +353,7 @@ class _SignUpState extends State<SignUp> with SingleTickerProviderStateMixin {
 
   // Submit handler for both tabs
   Future<void> _submit() async {
+    print('SignUp._submit() called; _showFaculty=$_showFaculty');
     // Determine which form to validate based on visibility
     if (_showFaculty) {
       // If faculty section is shown and user is signing up as faculty, validate faculty form
@@ -371,10 +394,11 @@ class _SignUpState extends State<SignUp> with SingleTickerProviderStateMixin {
           'userRole': 'Faculty',
         });
 
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userRole', 'Faculty');
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  await prefs.setString('userRole', 'Faculty');
 
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Subjects()));
+  // After faculty signup, send user to the Faculty landing/dashboard
+  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => FacultyDashboard()));
       }
     } catch (e) {
       showDialog(

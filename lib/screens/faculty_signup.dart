@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/subjects.dart';
+import 'package:stela_app/screens/signup.dart';
+import 'package:stela_app/screens/home.dart';
+import 'package:stela_app/screens/faculty_dashboard.dart';
 
 class FacultySignUp extends StatefulWidget {
   @override
@@ -19,16 +22,9 @@ class _FacultySignUpState extends State<FacultySignUp> {
   String _name = '';
   String _email = '';
   String _password = '';
-  String? _subject;
+  String _contact = '';
+  String _teacherCode = '';
   bool _loading = false;
-
-  final List<String> _subjects = [
-    'Cloud computing',
-    'Artificial intelligence',
-    'Internet of Things',
-    'DSA',
-    'Machine learning'
-  ];
 
   @override
   void dispose() {
@@ -42,7 +38,14 @@ class _FacultySignUpState extends State<FacultySignUp> {
       appBar: AppBar(
         title: Text('Create Account as Faculty', style: TextStyle(color: Colors.white)),
         backgroundColor: primaryBar,
-        leading: IconButton(icon: Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => Home()),
+            (route) => false,
+          ),
+        ),
       ),
       body: Center(
         child: Scrollbar(
@@ -82,17 +85,28 @@ class _FacultySignUpState extends State<FacultySignUp> {
                         validator: (v) => v == null || v.trim().isEmpty ? 'Name required' : null,
                       ),
                       SizedBox(height: 12),
-                      InputDecorator(
-                        decoration: InputDecoration(hintText: 'Subject', prefixIcon: Icon(Icons.list, color: primaryBar.withOpacity(0.7)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _subject,
-                            isExpanded: true,
-                            hint: Text('Select Subject'),
-                            items: _subjects.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                            onChanged: (v) => setState(() => _subject = v),
-                          ),
-                        ),
+                      TextFormField(
+                        decoration: InputDecoration(hintText: 'Teacher Code', prefixIcon: Icon(Icons.badge_outlined, color: primaryBar.withOpacity(0.8))),
+                        onChanged: (v) => _teacherCode = v,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Teacher code required';
+                          final name = _name.trim();
+                          if (name.isEmpty) return 'Enter full name first';
+                          final parts = name.split(RegExp(r"\s+"));
+                          if (parts.length < 2) return 'Enter first and last name to generate code';
+                          final expected = (parts.first[0] + parts.last).toLowerCase();
+                          final provided = v.trim().toLowerCase();
+                          if (provided != expected) return 'Teacher code should be "$expected" based on your name';
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 12),
+                      SizedBox(height: 12),
+                      TextFormField(
+                        decoration: InputDecoration(hintText: 'Phone Number', prefixIcon: Icon(Icons.phone, color: primaryBar.withOpacity(0.8))),
+                        keyboardType: TextInputType.phone,
+                        onChanged: (v) => _contact = v,
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Contact required' : null,
                       ),
                       SizedBox(height: 12),
                       TextFormField(
@@ -123,7 +137,19 @@ class _FacultySignUpState extends State<FacultySignUp> {
                             style: ElevatedButton.styleFrom(backgroundColor: primaryButton, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                             child: _loading ? CircularProgressIndicator() : Text('Sign Up', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
-                        )
+                        ),
+                        SizedBox(height: 12),
+                        // Link back to the student signup page
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Are you student?', style: TextStyle(color: primaryBar.withOpacity(0.8))),
+                            TextButton(
+                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SignUp())),
+                              child: Text('Sign up as Student', style: TextStyle(color: primaryButton)),
+                            )
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -145,12 +171,14 @@ class _FacultySignUpState extends State<FacultySignUp> {
       await FirebaseFirestore.instance.collection('faculty').doc(uid).set({
         'name': _name,
         'email': _email,
-        'subject': _subject,
+        'contactNumber': _contact,
+        'teacherCode': _teacherCode,
         'userRole': 'Faculty',
       });
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userRole', 'Faculty');
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Subjects()));
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  await prefs.setString('userRole', 'Faculty');
+  // After successful faculty signup, navigate to faculty landing/dashboard
+  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => FacultyDashboard()));
     } catch (e) {
       showDialog(context: context, builder: (_) => AlertDialog(title: Text('Signup failed'), content: Text(e.toString()), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('OK'))]));
     } finally {
