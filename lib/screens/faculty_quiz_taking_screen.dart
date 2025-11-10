@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'dart:async';
 import 'quiz_results_screen.dart';
 
@@ -98,7 +101,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     _showResults();
   }
 
-  void _showResults() {
+  Future<void> _showResults() async {
     int correctAnswers = 0;
     List<int?> userAnswers = [];
     
@@ -120,7 +123,184 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
         ? DateTime.now().difference(quizStartTime!)
         : Duration(seconds: totalTimeAllocated - timeRemaining);
 
-    // Navigate to detailed results screen
+  // Persist submission to Firestore so faculty can view it
+  String? submissionDocId;
+  try {
+      final user = FirebaseAuth.instance.currentUser;
+      final studentId = user?.uid ?? '';
+      String studentName = '';
+      if (studentId.isNotEmpty) {
+        final studentDoc = await FirebaseFirestore.instance.collection('students').doc(studentId).get();
+        if (studentDoc.exists) {
+          final data = studentDoc.data();
+          studentName = data?['name'] ?? '';
+        }
+      }
+
+      // Resolve faculty info: prefer widget.quiz fields but try to lookup in Realtime DB when missing.
+      String facultyId = widget.quiz['createdBy'] ?? '';
+      String facultyName = widget.quiz['createdByName'] ?? '';
+
+      // Compute a subjectKey that matches the Realtime DB structure used by QuizService.
+      String _mapSubjectIdToFacultyKey(String subjectId) {
+        final Map<String, String> mappings = {
+          'aipt': 'Artificial_Intelligence_-_Programming_Tools',
+          'artificial_intelligence_programming_tools': 'Artificial_Intelligence_-_Programming_Tools',
+          'cloud': 'Cloud_Computing',
+          'cloud_computing': 'Cloud_Computing',
+          'compiler': 'Compiler_Design',
+          'compiler_design': 'Compiler_Design',
+          'networks': 'Computer_Networks',
+          'computer_networks': 'Computer_Networks',
+          'coa': 'Computer_Organization_and_Architecture',
+          'computer_organization_and_architecture': 'Computer_Organization_and_Architecture',
+          'ml': 'Machine_Learning',
+          'machine_learning': 'Machine_Learning',
+          'wireless': 'Wireless_Networks',
+          'wireless_networks': 'Wireless_Networks',
+          'iot': 'Internet_of_Things',
+          'internet_of_things': 'Internet_of_Things',
+          'c_programming': 'C_Programming',
+        };
+        return mappings[subjectId] ?? subjectId.replaceAll('_', '_');
+      }
+
+      final rawSubjectId = (widget.subject['id'] ?? widget.subject['label'] ?? '').toString();
+      final subjectKey = _mapSubjectIdToFacultyKey(rawSubjectId);
+
+      if (facultyId.isEmpty || facultyName.isEmpty) {
+        try {
+          // Attempt to find the quiz in Realtime Database under the subjectKey and extract creator metadata.
+          print('Debug: attempting RTDB lookup for subjectKey="$subjectKey" (raw="$rawSubjectId")');
+          if (subjectKey.isNotEmpty) {
+            final dbRef = FirebaseDatabase.instance.ref().child('quizzes').child(subjectKey);
+            final snap = await dbRef.get();
+            print('Debug: RTDB snap.exists=${snap.exists}');
+            if (snap.exists) {
+              final data = snap.value as Map<dynamic, dynamic>;
+              print('Debug: RTDB entries=${data.keys.length}');
+
+              // Helper to compare candidate quiz map with widget.quiz
+              bool matchesQuiz(Map<dynamic, dynamic> candidate) {
+                try {
+                  // Fallback: match by title and duration and number of questions
+                  final t1 = (candidate['title'] ?? '').toString();
+                  final t2 = (widget.quiz['title'] ?? '').toString();
+                  final d1 = (candidate['duration'] ?? '').toString();
+                  final d2 = (widget.quiz['duration'] ?? '').toString();
+                  final q1 = (candidate['questions'] is List) ? (candidate['questions'] as List).length : 0;
+                  final q2 = (widget.quiz['questions'] is List) ? (widget.quiz['questions'] as List).length : 0;
+                  return t1 == t2 && d1 == d2 && q1 == q2;
+                } catch (e) {
+                  return false;
+                }
+              }
+
+              // Search top-level entries for either unit -> quiz or direct quiz
+              bool found = false;
+              for (var entry in data.entries) {
+                final key = entry.key;
+                final value = entry.value;
+                if (value is Map) {
+                  // If this looks like a unit (contains nested quizzes)
+                  bool isUnit = false;
+                  value.forEach((subKey, subValue) {
+                    if (subValue is Map && subValue.containsKey('title') && subValue.containsKey('questions')) {
+                      isUnit = true;
+                    }
+                  });
+
+                  if (isUnit) {
+                    // iterate nested quizzes
+                    value.forEach((subKey, subValue) {
+                      if (!found && subValue is Map) {
+                        // If widget.quiz has a key, try to match by it
+                        if (widget.quiz.containsKey('key') && widget.quiz['key'] != null && widget.quiz['key'].toString().isNotEmpty) {
+                          if (widget.quiz['key'].toString() == subKey.toString()) {
+                            facultyId = subValue['createdBy']?.toString() ?? facultyId;
+                            facultyName = subValue['createdByName']?.toString() ?? facultyName;
+                            found = true;
+                          }
+                        } else if (matchesQuiz(subValue)) {
+                          facultyId = subValue['createdBy']?.toString() ?? facultyId;
+                          facultyName = subValue['createdByName']?.toString() ?? facultyName;
+                          found = true;
+                        }
+                      }
+                    });
+                  } else {
+                    // direct quiz
+                    if (!found && value.containsKey('title') && value.containsKey('questions')) {
+                      if (widget.quiz.containsKey('key') && widget.quiz['key'] != null && widget.quiz['key'].toString().isNotEmpty) {
+                        if (widget.quiz['key'].toString() == key.toString()) {
+                          facultyId = value['createdBy']?.toString() ?? facultyId;
+                          facultyName = value['createdByName']?.toString() ?? facultyName;
+                          found = true;
+                        }
+                      } else if (matchesQuiz(value)) {
+                        facultyId = value['createdBy']?.toString() ?? facultyId;
+                        facultyName = value['createdByName']?.toString() ?? facultyName;
+                        found = true;
+                      }
+                    }
+                  }
+                }
+                if (found) break;
+              }
+              print('Debug: RTDB lookup finished, found=$found facultyId="$facultyId" facultyName="$facultyName"');
+            }
+          }
+        } catch (e) {
+          print('Error resolving quiz creator from Realtime DB: $e');
+        }
+      }
+
+      final submission = {
+        'quizId': widget.quiz['id'] ?? widget.quiz['key'] ?? '',
+        'quizTitle': widget.quiz['title'] ?? '',
+        'subjectLabel': (widget.subject['label'] ?? widget.subject['id'] ?? '').toString(),
+        'subjectKey': subjectKey,
+        'subjectId': rawSubjectId,
+        'unit': widget.quiz['unit'] ?? '',
+        'facultyId': facultyId,
+        'facultyName': facultyName,
+        'studentId': studentId,
+        'studentName': studentName,
+        'answers': userAnswers,
+        'correctAnswers': correctAnswers,
+        'percentage': percentage,
+        'timeTakenSeconds': timeTaken.inSeconds,
+        'timestamp': FieldValue.serverTimestamp(),
+        // store the quiz data so faculty can review questions with answers
+        'quizData': widget.quiz,
+      };
+
+    final docRef = await FirebaseFirestore.instance.collection('quiz_submissions').add(submission);
+    submissionDocId = docRef.id;
+      print('Submission saved with id: ${docRef.id} and facultyId: ${submission['facultyId']} subjectLabel: ${submission['subjectLabel']}');
+      // Read back the saved document to confirm what was written
+      try {
+        final saved = await docRef.get();
+        if (saved.exists) {
+          final savedData = saved.data();
+          print('Saved doc data: $savedData');
+        } else {
+          print('Saved doc not found after write (unexpected)');
+        }
+      } catch (e) {
+        print('Error reading back saved submission: $e');
+      }
+      // Show brief confirmation to student (non-blocking)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Quiz submitted successfully')),
+        );
+      }
+    } catch (e) {
+      print('Error saving quiz submission: $e');
+    }
+
+    // Navigate to detailed results screen, pass submission doc id so results can be sent/updated
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -132,6 +312,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
           correctAnswers: correctAnswers,
           percentage: percentage,
           timeTaken: timeTaken,
+          submissionDocId: submissionDocId,
         ),
       ),
     );

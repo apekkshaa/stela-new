@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 // For docx parsing, you may use: import 'package:docx_parse/docx_parse.dart'; (add to pubspec if needed)
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../firebase_options.dart';
 
 class FacultyQuizManage extends StatefulWidget {
@@ -216,6 +217,9 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       'pin': pin,
       'instructions': quizData is Map && quizData['instructions'] != null ? quizData['instructions'] : '',
       'totalMarks': quizData is Map && quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
+      // Track which faculty created this quiz
+      'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+      'createdByName': FirebaseAuth.instance.currentUser?.displayName ?? '',
     };
     
     // Store quiz under the specific unit
@@ -244,6 +248,9 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       'pin': pin,
       'instructions': quizData['instructions'] ?? '',
       'totalMarks': quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
+      // Preserve or set the creator
+      'createdBy': quizData['createdBy'] ?? FirebaseAuth.instance.currentUser?.uid ?? '',
+      'createdByName': quizData['createdByName'] ?? FirebaseAuth.instance.currentUser?.displayName ?? '',
     };
     
     // If unit has changed, we need to move the quiz

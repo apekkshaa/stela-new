@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'faculty_quiz_taking_screen.dart';
 
-class QuizResultsScreen extends StatelessWidget {
+class QuizResultsScreen extends StatefulWidget {
   final Map<String, dynamic> quiz;
   final Map<String, dynamic> subject;
   final List<Map<String, dynamic>> questions;
@@ -10,7 +11,7 @@ class QuizResultsScreen extends StatelessWidget {
   final int correctAnswers;
   final double percentage;
   final Duration timeTaken;
-
+  final String? submissionDocId;
   const QuizResultsScreen({
     Key? key,
     required this.quiz,
@@ -20,7 +21,33 @@ class QuizResultsScreen extends StatelessWidget {
     required this.correctAnswers,
     required this.percentage,
     required this.timeTaken,
+    this.submissionDocId,
   }) : super(key: key);
+
+  @override
+  _QuizResultsScreenState createState() => _QuizResultsScreenState();
+}
+
+class _QuizResultsScreenState extends State<QuizResultsScreen> {
+  bool _sending = false;
+
+  Future<void> _sendResultsToFaculty() async {
+    if (widget.submissionDocId == null || widget.submissionDocId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No submission id available to send')));
+      return;
+    }
+    setState(() { _sending = true; });
+    try {
+      final docRef = FirebaseFirestore.instance.collection('quiz_submissions').doc(widget.submissionDocId);
+      await docRef.update({'sentToFaculty': FieldValue.serverTimestamp()});
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Results sent to faculty')));
+    } catch (e) {
+      print('Error sending results to faculty: $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send results: $e')));
+    } finally {
+      setState(() { _sending = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +62,7 @@ class QuizResultsScreen extends StatelessWidget {
             color: Colors.white,
           ),
         ),
-        backgroundColor: subject['color'],
+  backgroundColor: widget.subject['color'],
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.close, color: Colors.white),
@@ -50,7 +77,7 @@ class QuizResultsScreen extends StatelessWidget {
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              color: subject['color'],
+              color: widget.subject['color'],
               borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(30),
                 bottomRight: Radius.circular(30),
@@ -62,7 +89,7 @@ class QuizResultsScreen extends StatelessWidget {
                 children: [
                   // Quiz title
                   Text(
-                    quiz['title'] ?? 'Quiz Results',
+                    widget.quiz['title'] ?? 'Quiz Results',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -92,16 +119,16 @@ class QuizResultsScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '${percentage.toStringAsFixed(1)}%',
+                          '${widget.percentage.toStringAsFixed(1)}%',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: percentage >= 70 ? Colors.green : Colors.orange,
+                            color: widget.percentage >= 70 ? Colors.green : Colors.orange,
                             fontFamily: 'PTSerif',
                           ),
                         ),
                         Text(
-                          '$correctAnswers/${questions.length}',
+                          '${widget.correctAnswers}/${widget.questions.length}',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[600],
@@ -136,7 +163,7 @@ class QuizResultsScreen extends StatelessWidget {
                 Expanded(
                   child: _buildStatCard(
                     'Correct',
-                    correctAnswers.toString(),
+                    widget.correctAnswers.toString(),
                     Colors.green,
                     Icons.check_circle,
                   ),
@@ -145,7 +172,7 @@ class QuizResultsScreen extends StatelessWidget {
                 Expanded(
                   child: _buildStatCard(
                     'Incorrect',
-                    (questions.length - correctAnswers).toString(),
+                    (widget.questions.length - widget.correctAnswers).toString(),
                     Colors.red,
                     Icons.cancel,
                   ),
@@ -154,7 +181,7 @@ class QuizResultsScreen extends StatelessWidget {
                 Expanded(
                   child: _buildStatCard(
                     'Time Taken',
-                    _formatDuration(timeTaken),
+                    _formatDuration(widget.timeTaken),
                     Colors.blue,
                     Icons.timer,
                   ),
@@ -168,14 +195,14 @@ class QuizResultsScreen extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Icon(Icons.analytics, color: subject['color']),
+                Icon(Icons.analytics, color: widget.subject['color']),
                 SizedBox(width: 8),
                 Text(
                   'Question Analysis',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: subject['color'],
+                    color: widget.subject['color'],
                     fontFamily: 'PTSerif',
                   ),
                 ),
@@ -188,7 +215,7 @@ class QuizResultsScreen extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              itemCount: questions.length,
+              itemCount: widget.questions.length,
               itemBuilder: (context, index) {
                 return _buildQuestionCard(index);
               },
@@ -200,57 +227,44 @@ class QuizResultsScreen extends StatelessWidget {
             padding: EdgeInsets.all(16),
             child: Row(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      // Retake quiz - go back to quiz taking screen
-                      Navigator.pop(context);
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => FacultyQuizTakingScreen(
-                            quiz: quiz,
-                            subject: subject,
-                          ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context); // Go back to subject detail
+                              },
+                              icon: Icon(Icons.home),
+                              label: Text(
+                                'Back to Subject',
+                                style: TextStyle(fontFamily: 'PTSerif'),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: widget.subject['color'],
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: _sending ? null : _sendResultsToFaculty,
+                              icon: Icon(Icons.send),
+                              label: Text('Send results to faculty', style: TextStyle(fontFamily: 'PTSerif')),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                    icon: Icon(Icons.refresh),
-                    label: Text(
-                      'Retake Quiz',
-                      style: TextStyle(fontFamily: 'PTSerif'),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context); // Go back to subject detail
-                    },
-                    icon: Icon(Icons.home),
-                    label: Text(
-                      'Back to Subject',
-                      style: TextStyle(fontFamily: 'PTSerif'),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: subject['color'],
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -301,8 +315,8 @@ class QuizResultsScreen extends StatelessWidget {
   }
 
   Widget _buildQuestionCard(int index) {
-    final question = questions[index];
-    final userAnswer = userAnswers[index];
+    final question = widget.questions[index];
+    final userAnswer = widget.userAnswers[index];
     final correctAnswer = question['correct'];
     final isCorrect = userAnswer == correctAnswer;
     
@@ -453,10 +467,11 @@ class QuizResultsScreen extends StatelessWidget {
   }
 
   String _getPerformanceMessage() {
-    if (percentage >= 90) return '🎉 Excellent! Outstanding performance!';
-    if (percentage >= 80) return '👏 Great job! You\'re doing very well!';
-    if (percentage >= 70) return '👍 Good work! Keep it up!';
-    if (percentage >= 60) return '📚 Not bad! A bit more practice will help!';
+    final p = widget.percentage;
+    if (p >= 90) return '🎉 Excellent! Outstanding performance!';
+    if (p >= 80) return '👏 Great job! You\'re doing very well!';
+    if (p >= 70) return '👍 Good work! Keep it up!';
+    if (p >= 60) return '📚 Not bad! A bit more practice will help!';
     return '💪 Keep practicing! You\'ll improve with time!';
   }
 
