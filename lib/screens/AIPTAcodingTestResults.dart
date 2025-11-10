@@ -7,7 +7,7 @@ import 'package:firebase_database/firebase_database.dart';
 
 import 'package:csv/csv.dart';
 
-import 'dart:html' as html;
+import 'package:stela_app/src/browser_html_stub.dart' if (dart.library.html) 'dart:html' as html;
 
 
 void main() async {
