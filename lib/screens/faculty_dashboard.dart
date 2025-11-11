@@ -179,13 +179,16 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
           children: [
             Icon(Icons.school, color: primaryBar),
             SizedBox(width: 8),
-            Text(
-              "Faculty Dashboard",
-              style: TextStyle(
-                color: primaryBar,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-                fontFamily: 'PTSerif-Bold',
+            Flexible(
+              child: Text(
+                "Faculty Dashboard",
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: primaryBar,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  fontFamily: 'PTSerif-Bold',
+                ),
               ),
             ),
           ],

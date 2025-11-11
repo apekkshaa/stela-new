@@ -383,7 +383,9 @@ class _LoginState extends State<Login> {
         ),
       );
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
