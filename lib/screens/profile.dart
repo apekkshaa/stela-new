@@ -15,11 +15,31 @@ class Profile extends StatefulWidget {
 class _ProfileState extends State<Profile> {
   bool isLoading = true;
   bool hasError = false;
+  bool isEditing = false;
+
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+  late TextEditingController _enrollmentController;
+  late TextEditingController _contactController;
 
   @override
   void initState() {
     super.initState();
+    // initialize controllers to avoid null/dispose issues
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _enrollmentController = TextEditingController();
+    _contactController = TextEditingController();
     fetchUserDetails();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _enrollmentController.dispose();
+    _contactController.dispose();
+    super.dispose();
   }
 
   Future<void> fetchUserDetails() async {
@@ -31,6 +51,11 @@ class _ProfileState extends State<Profile> {
     try {
       // Fetch user details from Firestore
       await getDetails();
+  // populate controllers with fetched values
+  _nameController.text = name;
+  _emailController.text = email;
+  _enrollmentController.text = enrollmentNo;
+  _contactController.text = contactNum;
       print("✅ User details fetched successfully");
     } catch (e) {
       print("❌ Error fetching user details: $e");
@@ -42,6 +67,51 @@ class _ProfileState extends State<Profile> {
         isLoading = false;
       });
     }
+  }
+
+  Future<void> _saveChanges() async {
+    final updates = <String, dynamic>{
+      'name': _nameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'contactNumber': _contactController.text.trim(),
+    };
+    if (userRole.toLowerCase() == 'student') {
+      updates['enrollmentNumber'] = _enrollmentController.text.trim();
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+    try {
+      await updateDetails(updates);
+      // Refresh local values
+      await fetchUserDetails();
+      setState(() {
+        isEditing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Profile updated')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update profile: $e')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  void _cancelEditing() {
+    // Reset controllers to current values
+    _nameController.text = name;
+    _emailController.text = email;
+    _enrollmentController.text = enrollmentNo;
+    _contactController.text = contactNum;
+    setState(() {
+      isEditing = false;
+    });
   }
 
   // Navigation methods
@@ -381,16 +451,35 @@ class _ProfileState extends State<Profile> {
                                     ),
                                   ),
                                   SizedBox(height: 16),
-                                  Text(
-                                    name.isNotEmpty ? name : 'Student Name',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontFamily: 'PTSerif-Bold',
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
+                                  // Editable name field when in edit mode
+                                  isEditing
+                                      ? TextField(
+                                          controller: _nameController,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontFamily: 'PTSerif-Bold',
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          decoration: InputDecoration(
+                                            border: InputBorder.none,
+                                            hintText: 'Student Name',
+                                            hintStyle: TextStyle(
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                        )
+                                      : Text(
+                                          name.isNotEmpty ? name : 'Student Name',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 24,
+                                            fontFamily: 'PTSerif-Bold',
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
                                   SizedBox(height: 8),
                                   Text(
                                     userRole.isNotEmpty
@@ -426,40 +515,70 @@ class _ProfileState extends State<Profile> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'User Information',
-                                    style: TextStyle(
-                                      color: primaryBar,
-                                      fontSize: 20,
-                                      fontFamily: 'PTSerif-Bold',
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'User Information',
+                                        style: TextStyle(
+                                          color: primaryBar,
+                                          fontSize: 20,
+                                          fontFamily: 'PTSerif-Bold',
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      isEditing
+                                          ? Row(
+                                              children: [
+                                                TextButton(
+                                                  onPressed: _cancelEditing,
+                                                  child: Text('Cancel'),
+                                                ),
+                                                ElevatedButton(
+                                                  onPressed: _saveChanges,
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: primaryButton,
+                                                  ),
+                                                  child: Text('Save'),
+                                                ),
+                                              ],
+                                            )
+                                          : TextButton.icon(
+                                              onPressed: () {
+                                                setState(() {
+                                                  isEditing = true;
+                                                });
+                                              },
+                                              icon: Icon(Icons.edit, size: 18),
+                                              label: Text('Edit'),
+                                            ),
+                                    ],
                                   ),
-                                  SizedBox(height: 20),
-                                  buildDetailRow('Name',
-                                      name.isNotEmpty ? name : 'Not available'),
-                                  buildDetailRow(
-                                      'Email',
-                                      email.isNotEmpty
-                                          ? email
-                                          : 'Not available'),
-                                  // Only show enrollment number for students
-                                  if (userRole.toLowerCase() == 'student')
-                                    buildDetailRow(
-                                        'Enrollment Number',
-                                        enrollmentNo.isNotEmpty
-                                            ? enrollmentNo
-                                            : 'Not available'),
-                                  buildDetailRow(
-                                      'Contact Number',
-                                      contactNum.isNotEmpty
-                                          ? contactNum
-                                          : 'Not available'),
-                                  buildDetailRow(
-                                      'Role',
-                                      userRole.isNotEmpty
-                                          ? userRole.toUpperCase()
-                                          : 'STUDENT'),
+                  SizedBox(height: 20),
+                  buildDetailRow('Name',
+                    name.isNotEmpty ? name : 'Not available'),
+                  buildDetailRow(
+                    'Email',
+                    email.isNotEmpty
+                      ? email
+                      : 'Not available'),
+                  // Only show enrollment number for students
+                  if (userRole.toLowerCase() == 'student')
+                  buildDetailRow(
+                    'Enrollment Number',
+                    enrollmentNo.isNotEmpty
+                      ? enrollmentNo
+                      : 'Not available'),
+                  buildDetailRow(
+                    'Contact Number',
+                    contactNum.isNotEmpty
+                      ? contactNum
+                      : 'Not available'),
+                  buildDetailRow(
+                    'Role',
+                    userRole.isNotEmpty
+                      ? userRole.toUpperCase()
+                      : 'STUDENT'),
                                 ],
                               ),
                             ),
@@ -572,15 +691,39 @@ class _ProfileState extends State<Profile> {
           ),
           SizedBox(width: 16),
           Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: primaryBar,
-                fontSize: 14,
-                fontFamily: 'PTSerif',
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            child: isEditing && (label == 'Name' || label == 'Email' || label == 'Enrollment Number' || label == 'Contact Number')
+                ? TextField(
+                    controller: label == 'Name'
+                        ? _nameController
+                        : label == 'Email'
+                            ? _emailController
+                            : label == 'Enrollment Number'
+                                ? _enrollmentController
+                                : _contactController,
+                    style: TextStyle(
+                      color: primaryBar,
+                      fontSize: 14,
+                      fontFamily: 'PTSerif',
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: primaryBar.withOpacity(0.2)),
+                      ),
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: TextStyle(
+                      color: primaryBar,
+                      fontSize: 14,
+                      fontFamily: 'PTSerif',
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
           ),
         ],
       ),

@@ -13,6 +13,7 @@ String name = "",
 
 Map<String, dynamic>? data, document;
 var userDetails;
+String? userCollection;
 
 // ✅ FIXED: Return type changed from void ➝ Future<void>
 Future<void> getDetails() async {
@@ -53,6 +54,18 @@ Future<void> getDetails() async {
 
   // Remember which collection we found by checking a likely userRole field
   userRole = data?['userRole'] ?? userRole ?? "";
+  // Record the collection where the document was found so updates can target it
+  // We infer collection from the document's path: students, faculty, or admins
+  // The earlier loop found the document in 'col' — but we don't keep 'col' here,
+  // so derive from common keys or fallback to 'students'. If the document
+  // contains 'enrollmentNumber' we assume it's a student, otherwise fall back.
+  if (data != null && data!.containsKey('enrollmentNumber')) {
+    userCollection = 'students';
+  } else if (data != null && (data!.containsKey('department') || userRole.toLowerCase() == 'faculty')) {
+    userCollection = 'faculty';
+  } else {
+    userCollection = 'students';
+  }
 
   // Assign values from the found document with common fallback keys.
   name = data?['name'] ?? data?['fullName'] ?? "";
@@ -70,6 +83,45 @@ Future<void> getDetails() async {
     print('🔎 getDetails(): fetched document data is empty or missing keys:');
     print(data);
   }
+}
+
+/// Update user details in Firestore. This will attempt to update the document
+/// in the earlier-detected user collection (if available) or fall back to
+/// trying students/faculty/admins in that order. The updates map should
+/// contain the fields to be updated.
+Future<void> updateDetails(Map<String, dynamic> updates) async {
+  final uid = userUID ?? FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) {
+    throw Exception('No user UID available for update');
+  }
+
+  final firestore = FirebaseFirestore.instance;
+
+  // If we know the collection, try it first
+  if (userCollection != null) {
+    try {
+      await firestore.collection(userCollection!).doc(uid).update(updates);
+      return;
+    } catch (e) {
+      // Continue to fallback
+      print('updateDetails: failed to update in $userCollection — $e');
+    }
+  }
+
+  // Fallback search order
+  final colOrder = ['students', 'faculty', 'admins'];
+  for (final col in colOrder) {
+    final docRef = firestore.collection(col).doc(uid);
+    final snap = await docRef.get();
+    if (snap.exists) {
+      await docRef.update(updates);
+      // remember for next time
+      userCollection = col;
+      return;
+    }
+  }
+
+  throw Exception('updateDetails: no user document found to update');
 }
 
 // (Optional: Keep it commented if not used)
