@@ -57,9 +57,23 @@ class _FacultySubjectPickerState extends State<FacultySubjectPicker> with Ticker
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
-    final isTablet = screenSize.width > 600;
-    final crossAxisCount = isTablet ? 3 : 2;
-    final childAspectRatio = isTablet ? 2.2 : 2.0;
+    // Responsive grid: 1 column on small/mobile widths, 2 on medium, 3 on large/tablet+.
+    final double width = screenSize.width;
+    int crossAxisCount;
+    double childAspectRatio;
+    if (width < 480) {
+      // Mobile phones (portrait) — one card per row
+      crossAxisCount = 1;
+      childAspectRatio = 3.4; // wider card
+    } else if (width < 800) {
+      // Small tablets / landscape phones — two columns
+      crossAxisCount = 2;
+      childAspectRatio = 2.2;
+    } else {
+      // Large screens / tablets — three columns
+      crossAxisCount = 3;
+      childAspectRatio = 2.2;
+    }
 
     return Scaffold(
       body: CustomScrollView(
@@ -283,10 +297,12 @@ class _FacultySubjectPickerState extends State<FacultySubjectPicker> with Ticker
                   ),
                 ),
                 SizedBox(width: 12),
-                Expanded(
+                Flexible(
+                    fit: FlexFit.loose,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           (subject['title'] ?? subject['label'] ?? 'Untitled').toString(),
@@ -296,7 +312,7 @@ class _FacultySubjectPickerState extends State<FacultySubjectPicker> with Ticker
                             color: primaryBar,
                             fontFamily: 'PTSerif-Bold',
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: 2),
@@ -307,12 +323,14 @@ class _FacultySubjectPickerState extends State<FacultySubjectPicker> with Ticker
                             color: primaryBar.withOpacity(0.6),
                             fontFamily: 'PTSerif',
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: subject['color'].withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -323,14 +341,14 @@ class _FacultySubjectPickerState extends State<FacultySubjectPicker> with Ticker
                       Icon(
                         Icons.edit,
                         color: subject['color'],
-                        size: 14,
+                        size: 12,
                       ),
                       SizedBox(width: 4),
                       Text(
                         'Manage',
                         style: TextStyle(
                           color: subject['color'],
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
