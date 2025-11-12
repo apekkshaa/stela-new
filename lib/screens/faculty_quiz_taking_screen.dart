@@ -29,6 +29,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
   int totalTimeAllocated = 0; // in seconds
   bool quizCompleted = false;
   DateTime? quizStartTime;
+  bool _alreadySubmitted = false;
 
   @override
   void initState() {
@@ -49,6 +50,31 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     quizStartTime = DateTime.now();
     
     _startTimer();
+    // Check if the current user has already submitted this quiz
+    _checkExistingSubmission();
+  }
+
+  Future<void> _checkExistingSubmission() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final studentId = user?.uid;
+      if (studentId == null || studentId.isEmpty) return;
+      final quizId = (widget.quiz['id'] ?? widget.quiz['key'] ?? '').toString();
+      if (quizId.isEmpty) return;
+      final snap = await FirebaseFirestore.instance
+          .collection('quiz_submissions')
+          .where('quizId', isEqualTo: quizId)
+          .where('studentId', isEqualTo: studentId)
+          .limit(1)
+          .get();
+      if (snap.docs.isNotEmpty) {
+        setState(() {
+          _alreadySubmitted = true;
+        });
+      }
+    } catch (e) {
+      print('Error checking existing submission: $e');
+    }
   }
 
   void _startTimer() {
@@ -125,6 +151,29 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
 
   // Persist submission to Firestore so faculty can view it
   String? submissionDocId;
+    // Double-check to prevent multiple submissions (race condition)
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final studentId = user?.uid ?? '';
+      final quizIdCheck = (widget.quiz['id'] ?? widget.quiz['key'] ?? '').toString();
+      if (studentId.isNotEmpty && quizIdCheck.isNotEmpty) {
+        final existing = await FirebaseFirestore.instance
+            .collection('quiz_submissions')
+            .where('quizId', isEqualTo: quizIdCheck)
+            .where('studentId', isEqualTo: studentId)
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          // Already submitted
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('You have already submitted this quiz. Multiple attempts are not allowed.')));
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      print('Error checking existing submission before save: $e');
+    }
   try {
       final user = FirebaseAuth.instance.currentUser;
       final studentId = user?.uid ?? '';
@@ -326,6 +375,28 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_alreadySubmitted) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.quiz['title'] ?? 'Quiz'),
+          backgroundColor: widget.subject['color'],
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('You have already attempted this quiz. Multiple attempts are not allowed.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
+                SizedBox(height: 12),
+                ElevatedButton(onPressed: () => Navigator.pop(context), child: Text('Back')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (questions.isEmpty) {
       return Scaffold(
         appBar: AppBar(
