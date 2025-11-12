@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:csv/csv.dart';
+import 'package:excel/excel.dart';
 import 'package:flutter/services.dart';
 import '../utils/download_helper.dart' as download_helper;
 import 'faculty_quiz_submissions_list.dart';
@@ -73,9 +73,9 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         backgroundColor: widget.subject['color'],
         actions: [
           IconButton(
-            tooltip: 'Export CSV',
+            tooltip: 'Export XLSX',
             icon: Icon(Icons.download),
-            onPressed: () => _exportCsv(),
+            onPressed: () => _exportXlsx(),
           ),
         ],
       ),
@@ -167,9 +167,9 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
                             ElevatedButton(
                               onPressed: () async {
                                 // Export only these docs
-                                await _exportDocsToCsv(list, quizTitle.replaceAll(' ', '_'));
+                                await _exportDocsToXlsx(list, quizTitle.replaceAll(' ', '_'));
                               },
-                              child: Text('Export CSV'),
+                              child: Text('Export XLSX'),
                             ),
                           ],
                         ),
@@ -185,7 +185,7 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
     );
   }
 
-  Future<void> _exportDocsToCsv(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, String filenameBase) async {
+  Future<void> _exportDocsToXlsx(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, String filenameBase) async {
     try {
       if (docs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No submissions to export')));
@@ -205,10 +205,34 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         'Unit',
       ]);
 
+      // Build a cache of student enrollment numbers to avoid repeated reads
+      final Map<String, String> enrollmentCache = {};
+      final Set<String> studentIds = {};
+      for (var doc in docs) {
+        final sid = (doc.data()['studentId'] ?? '').toString();
+        if (sid.isNotEmpty) studentIds.add(sid);
+      }
+      // Fetch student docs concurrently
+      try {
+        final futures = studentIds.map((id) => FirebaseFirestore.instance.collection('students').doc(id).get());
+        final snaps = await Future.wait(futures);
+        for (var s in snaps) {
+          if (s.exists) {
+            final sd = s.data();
+            if (sd != null) {
+              enrollmentCache[s.id] = sd['enrollmentNumber'] ?? sd['enrollmentNo'] ?? '';
+            }
+          }
+        }
+      } catch (e) {
+        print('Error fetching student enrollments: $e');
+      }
+
       for (var doc in docs) {
         final data = doc.data();
         final timestamp = (data['timestamp'] as Timestamp?)?.toDate().toIso8601String() ?? '';
-        final studentId = data['studentId'] ?? '';
+  final studentId = data['studentId'] ?? '';
+  final enrollmentNumber = (studentId != '' ? (enrollmentCache[studentId] ?? '') : '');
         final studentName = data['studentName'] ?? '';
         final correct = data['correctAnswers'] ?? data['correct'];
         // try to estimate total questions from quizData or answers
@@ -234,7 +258,7 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
 
         rows.add([
           timestamp,
-          studentId,
+          enrollmentNumber.isNotEmpty ? enrollmentNumber : studentId,
           studentName,
           correct?.toString() ?? '',
           wrong,
@@ -244,7 +268,34 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         ]);
       }
 
-      final csv = const ListToCsvConverter().convert(rows);
+      // Build XLSX workbook
+      final excel = Excel.createExcel();
+      final sheetName = 'Submissions';
+      Sheet sheet = excel[sheetName];
+      // Remove default sheet (e.g. Sheet1) if present so workbook only contains our 'Submissions' sheet
+      try {
+        final names = excel.sheets.keys.toList();
+        for (final n in names) {
+          if (n != sheetName) {
+            excel.delete(n);
+          }
+        }
+      } catch (_) {}
+      CellValue? _toCellValue(dynamic v) {
+        if (v == null) return null;
+        final s = v.toString();
+        final i = int.tryParse(s);
+        if (i != null) return IntCellValue(i);
+        final d = double.tryParse(s);
+        if (d != null) return DoubleCellValue(d);
+        return TextCellValue(s);
+      }
+
+      for (var r = 0; r < rows.length; r++) {
+        final row = rows[r];
+        sheet.appendRow(row.map((e) => _toCellValue(e)).toList());
+      }
+      final bytes = excel.encode();
       // Sanitize filename: remove problematic chars and collapse whitespace
       String _sanitize(String s) {
         return s
@@ -253,16 +304,18 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
             .replaceAll(RegExp(r"_+"), '_');
       }
       final safeName = _sanitize(filenameBase);
-      final filename = '${safeName}.csv';
-      final pathOrResult = await download_helper.downloadCsvFile(filename, csv);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('CSV exported: $pathOrResult')));
+      final filename = '${safeName}.xlsx';
+      // bytes may be null in some cases; guard
+      final fileBytes = bytes ?? <int>[];
+      final pathOrResult = await download_helper.downloadXlsxFile(filename, fileBytes);
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('XLSX exported: $pathOrResult')));
     } catch (e) {
       print('Error exporting docs CSV: $e');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
-  Future<void> _exportCsv() async {
+  Future<void> _exportXlsx() async {
   final subjectLabel = widget.subject['label'] ?? widget.subject['id'] ?? '';
   // Prefer explicit subject id if present, otherwise normalize the human-readable label
   final rawSubjectId = (widget.subject['id'] ?? _normalizeSubjectIdFromLabel(widget.subject['label'] ?? '') ?? widget.subject['label'] ?? '').toString();
@@ -333,11 +386,34 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         'Unit',
       ]);
 
+      // Build cache for student enrollment numbers
+      final Map<String, String> enrollmentCache = {};
+      final Set<String> studentIds = {};
+      for (var doc in filteredDocs) {
+        final sid = (doc.data()['studentId'] ?? '').toString();
+        if (sid.isNotEmpty) studentIds.add(sid);
+      }
+      try {
+        final futures = studentIds.map((id) => FirebaseFirestore.instance.collection('students').doc(id).get());
+        final snaps = await Future.wait(futures);
+        for (var s in snaps) {
+          if (s.exists) {
+            final sd = s.data();
+            if (sd != null) {
+              enrollmentCache[s.id] = sd['enrollmentNumber'] ?? sd['enrollmentNo'] ?? '';
+            }
+          }
+        }
+      } catch (e) {
+        print('Error fetching student enrollments: $e');
+      }
+
       for (var doc in filteredDocs) {
         final data = doc.data();
         final timestamp = (data['timestamp'] as Timestamp?)?.toDate().toIso8601String() ?? '';
         final studentId = data['studentId'] ?? '';
         final studentName = data['studentName'] ?? '';
+        final enrollmentNumber = (studentId != '' ? (enrollmentCache[studentId] ?? '') : '');
         final correct = data['correctAnswers'] ?? data['correct'];
         int? totalQuestions;
         try {
@@ -359,7 +435,7 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
 
         rows.add([
           timestamp,
-          studentId,
+          enrollmentNumber.isNotEmpty ? enrollmentNumber : studentId,
           studentName,
           correct?.toString() ?? '',
           wrong,
@@ -369,20 +445,47 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         ]);
       }
 
-      String csv = const ListToCsvConverter().convert(rows);
+      // Create XLSX workbook
+      final excel = Excel.createExcel();
+      final sheetName = 'Submissions';
+      Sheet sheet = excel[sheetName];
+      // Remove default sheet (e.g. Sheet1) if present so workbook only contains our 'Submissions' sheet
+      try {
+        final names = excel.sheets.keys.toList();
+        for (final n in names) {
+          if (n != sheetName) {
+            excel.delete(n);
+          }
+        }
+      } catch (_) {}
+      CellValue? _toCellValue2(dynamic v) {
+        if (v == null) return null;
+        final s = v.toString();
+        final i = int.tryParse(s);
+        if (i != null) return IntCellValue(i);
+        final d = double.tryParse(s);
+        if (d != null) return DoubleCellValue(d);
+        return TextCellValue(s);
+      }
+
+      for (var r = 0; r < rows.length; r++) {
+        final row = rows[r];
+        sheet.appendRow(row.map((e) => _toCellValue2(e)).toList());
+      }
+      final bytes = excel.encode();
 
       try {
-        // Use helper which handles web vs IO platforms
-        final filename = 'submissions_${subjectLabel.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.csv';
-  final pathOrResult = await download_helper.downloadCsvFile(filename, csv);
-        // On IO platforms pathOrResult is a filesystem path, on web it's a download marker
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('CSV exported: $pathOrResult')));
+    // Use helper which handles web vs IO platforms
+    final filename = 'submissions_${subjectLabel.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+  final pathOrResult = await download_helper.downloadXlsxFile(filename, bytes ?? <int>[]);
+    // On IO platforms pathOrResult is a filesystem path, on web it's a download marker
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('XLSX exported: $pathOrResult')));
         // If we got a file path, offer to copy it
         if (!pathOrResult.startsWith('downloaded:')) {
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
-              title: Text('CSV Exported'),
+              title: Text('XLSX Exported'),
               content: SelectableText(pathOrResult),
               actions: [
                 TextButton(
@@ -402,12 +505,12 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
           );
         }
       } catch (e) {
-        print('Error exporting CSV (write/download): $e');
+        print('Error exporting XLSX (write/download): $e');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     } catch (e) {
-      print('Error exporting CSV: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+        print('Error exporting XLSX: $e');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
