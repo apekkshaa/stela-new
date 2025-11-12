@@ -15,6 +15,7 @@ import 'package:stela_app/screens/subjects.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stela_app/screens/home.dart';
+import 'package:stela_app/screens/profile.dart';
 
 // Import your upload, assignment, quiz, etc. pages here
 
@@ -148,7 +149,10 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
   ];
 
   void _navigateToProfile() {
-    // Navigator.push(context, MaterialPageRoute(builder: (_) => Profile()));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => Profile()),
+    );
   }
 
   void _logout() {

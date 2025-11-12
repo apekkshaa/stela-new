@@ -427,7 +427,7 @@ class _ProfileState extends State<Profile> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Student Information',
+                                    'User Information',
                                     style: TextStyle(
                                       color: primaryBar,
                                       fontSize: 20,
@@ -443,11 +443,13 @@ class _ProfileState extends State<Profile> {
                                       email.isNotEmpty
                                           ? email
                                           : 'Not available'),
-                                  buildDetailRow(
-                                      'Enrollment Number',
-                                      enrollmentNo.isNotEmpty
-                                          ? enrollmentNo
-                                          : 'Not available'),
+                                  // Only show enrollment number for students
+                                  if (userRole.toLowerCase() == 'student')
+                                    buildDetailRow(
+                                        'Enrollment Number',
+                                        enrollmentNo.isNotEmpty
+                                            ? enrollmentNo
+                                            : 'Not available'),
                                   buildDetailRow(
                                       'Contact Number',
                                       contactNum.isNotEmpty
