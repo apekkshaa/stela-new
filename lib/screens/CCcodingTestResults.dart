@@ -1,12 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:csv/csv.dart';
-
-
-import 'package:stela_app/src/browser_html_stub.dart' if (dart.library.html) 'dart:html' as html;
+import '../utils/excel_helper.dart' as excel_helper;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,7 +65,6 @@ class _CCTablePageState extends State<CCTablePage> {
           List<String> data10 = [];
           List<String> data11 = [];
           List<String> data12 = [];
-          List<String> data13 = [];
           String totalMarks;
 
           values.forEach((key, value) {
@@ -200,28 +194,12 @@ class _CCTablePageState extends State<CCTablePage> {
     ]);
   }
 
-  String csv = const ListToCsvConverter().convert(rows);
-
-
-  // Create a blob containing the CSV data
-  final List<int> data = utf8.encode(csv);
-  final blob = html.Blob([data]);
-
-  // Create a URL for the blob
-  final url = html.Url.createObjectUrlFromBlob(blob);
-
-  // Create an anchor element
-  final anchor = html.AnchorElement(href: url)
-    ..setAttribute("download", "CC_Coding_Assessment_Results.csv")
-    ..style.display = 'none';
-
-  // Trigger a download
-  html.document.body!.children.add(anchor);
-  anchor.click();
-
-  // Clean up
-  html.document.body!.children.remove(anchor);
-  html.Url.revokeObjectUrl(url);
+  try {
+    await excel_helper.downloadExcelFile('CC_Coding_Assessment_Results.xlsx', rows);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Excel file downloaded successfully!')));
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+  }
   }
 
 

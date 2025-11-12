@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:csv/csv.dart';
 import 'package:flutter/services.dart';
-import '../utils/download_helper.dart' as download_helper;
+import '../utils/excel_helper.dart' as excel_helper;
 import 'faculty_quiz_submissions_list.dart';
 
 class FacultySubmissionsManage extends StatefulWidget {
@@ -73,9 +72,9 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         backgroundColor: widget.subject['color'],
         actions: [
           IconButton(
-            tooltip: 'Export CSV',
+            tooltip: 'Export Excel',
             icon: Icon(Icons.download),
-            onPressed: () => _exportCsv(),
+            onPressed: () => _exportExcel(),
           ),
         ],
       ),
@@ -167,9 +166,9 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
                             ElevatedButton(
                               onPressed: () async {
                                 // Export only these docs
-                                await _exportDocsToCsv(list, quizTitle.replaceAll(' ', '_'));
+                                await _exportDocsToExcel(list, quizTitle.replaceAll(' ', '_'));
                               },
-                              child: Text('Export CSV'),
+                              child: Text('Export Excel'),
                             ),
                           ],
                         ),
@@ -185,7 +184,7 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
     );
   }
 
-  Future<void> _exportDocsToCsv(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, String filenameBase) async {
+  Future<void> _exportDocsToExcel(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, String filenameBase) async {
     try {
       if (docs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No submissions to export')));
@@ -244,7 +243,6 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         ]);
       }
 
-      final csv = const ListToCsvConverter().convert(rows);
       // Sanitize filename: remove problematic chars and collapse whitespace
       String _sanitize(String s) {
         return s
@@ -253,16 +251,16 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
             .replaceAll(RegExp(r"_+"), '_');
       }
       final safeName = _sanitize(filenameBase);
-      final filename = '${safeName}.csv';
-      final pathOrResult = await download_helper.downloadCsvFile(filename, csv);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('CSV exported: $pathOrResult')));
+      final filename = '${safeName}.xlsx';
+      final pathOrResult = await excel_helper.downloadExcelFile(filename, rows);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Excel exported: $pathOrResult')));
     } catch (e) {
-      print('Error exporting docs CSV: $e');
+      print('Error exporting docs Excel: $e');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
-  Future<void> _exportCsv() async {
+  Future<void> _exportExcel() async {
   final subjectLabel = widget.subject['label'] ?? widget.subject['id'] ?? '';
   // Prefer explicit subject id if present, otherwise normalize the human-readable label
   final rawSubjectId = (widget.subject['id'] ?? _normalizeSubjectIdFromLabel(widget.subject['label'] ?? '') ?? widget.subject['label'] ?? '').toString();
@@ -313,7 +311,7 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
       }).toList();
 
   // Debug: how many docs fetched vs how many match the client-side filter
-  print('Export CSV: subjectLabel="$subjectLabel" rawSubjectId="$rawSubjectId" subjectKey="$subjectKey" fetched=${docs.length} filtered=${filteredDocs.length} facultyId=$facultyId');
+  print('Export Excel: subjectLabel="$subjectLabel" rawSubjectId="$rawSubjectId" subjectKey="$subjectKey" fetched=${docs.length} filtered=${filteredDocs.length} facultyId=$facultyId');
 
       if (filteredDocs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No submissions to export')));
@@ -369,20 +367,18 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         ]);
       }
 
-      String csv = const ListToCsvConverter().convert(rows);
-
       try {
-        // Use helper which handles web vs IO platforms
-        final filename = 'submissions_${subjectLabel.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.csv';
-  final pathOrResult = await download_helper.downloadCsvFile(filename, csv);
+        // Use Excel helper to create Excel file
+        final filename = 'submissions_${subjectLabel.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+        final pathOrResult = await excel_helper.downloadExcelFile(filename, rows);
         // On IO platforms pathOrResult is a filesystem path, on web it's a download marker
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('CSV exported: $pathOrResult')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Excel exported: $pathOrResult')));
         // If we got a file path, offer to copy it
         if (!pathOrResult.startsWith('downloaded:')) {
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
-              title: Text('CSV Exported'),
+              title: Text('Excel Exported'),
               content: SelectableText(pathOrResult),
               actions: [
                 TextButton(
@@ -402,84 +398,15 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
           );
         }
       } catch (e) {
-        print('Error exporting CSV (write/download): $e');
+        print('Error exporting Excel (write/download): $e');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     } catch (e) {
-      print('Error exporting CSV: $e');
+      print('Error exporting Excel: $e');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
   
 
-  void _showSubmissionDetails(String docId, Map<String, dynamic> data) {
-    final quizData = data['quizData'] as Map<String, dynamic>?;
-    final questions = (quizData != null && quizData['facultyQuestions'] != null)
-        ? List<Map<String, dynamic>>.from(quizData['facultyQuestions'])
-        : (quizData != null && quizData['questions'] != null)
-            ? List<Map<String, dynamic>>.from(quizData['questions'])
-            : <Map<String, dynamic>>[];
-
-    final answers = List<dynamic>.from(data['answers'] ?? []);
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('${data['studentName'] ?? 'Student'} — ${data['quizTitle'] ?? 'Quiz'}'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: List.generate(questions.length, (index) {
-                final q = questions[index];
-                final userAnswer = answers.length > index ? answers[index] : null;
-                final correct = q['correct'];
-                final options = List<String>.from(q['options'] ?? []);
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${index + 1}. ${q['question'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold)),
-                      SizedBox(height: 6),
-                      ...List.generate(options.length, (optIdx) {
-                        final opt = options[optIdx];
-                        final isUser = userAnswer == optIdx;
-                        final isCorrect = correct == optIdx;
-                        Color bg = Colors.transparent;
-                        if (isCorrect) bg = Colors.green.withOpacity(0.15);
-                        else if (isUser && !isCorrect) bg = Colors.red.withOpacity(0.12);
-
-                        return Container(
-                          margin: EdgeInsets.only(bottom: 6),
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-                          child: Row(
-                            children: [
-                              Text('${String.fromCharCode(65 + optIdx)}. ', style: TextStyle(fontWeight: FontWeight.bold)),
-                              Expanded(child: Text(opt)),
-                              if (isCorrect)
-                                Icon(Icons.check_circle, color: Colors.green, size: 18)
-                              else if (isUser && !isCorrect)
-                                Icon(Icons.cancel, color: Colors.red, size: 18),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                );
-              }),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Close')),
-        ],
-      ),
-    );
-  }
 }

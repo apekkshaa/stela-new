@@ -221,48 +221,48 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: 28, horizontal: 24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [primaryBar.withOpacity(0.93), Colors.blueAccent.withOpacity(0.85)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryBar.withOpacity(0.93), Colors.blueAccent.withOpacity(0.85)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(32),
+                    bottomRight: Radius.circular(32),
+                  ),
                 ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(32),
-                  bottomRight: Radius.circular(32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 8),
+                    Text(
+                      "Welcome, Faculty!",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      "Manage your subjects and resources easily.",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 15,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                  ],
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: 8),
-                  Text(
-                    "Welcome, Faculty!",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    "Manage your subjects and resources easily.",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 15,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                ],
-              ),
-            ),
-            Expanded(
-              child: LayoutBuilder(
+              LayoutBuilder(
                 builder: (context, constraints) {
                   int crossAxisCount = 1;
                   double aspectRatio = 2.5;
@@ -289,6 +289,8 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
                         childAspectRatio: aspectRatio,
                       ),
                       itemCount: features.length,
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
                       itemBuilder: (context, index) {
                         final feature = features[index];
                         final cardColor = cardColors[index % cardColors.length];
@@ -298,8 +300,8 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
                   );
                 },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
