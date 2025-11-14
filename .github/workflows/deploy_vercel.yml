@@ -175,13 +175,36 @@ jobs:
           fi
 
           pushd build/web
+          # If the build directory doesn't contain a .git, create a minimal git repo
+          # with a single commit authored by the expected Vercel team owner. This
+          # ensures the Vercel CLI can read commit metadata from the repo rather
+          # than falling back to an unauthenticated local author string.
+          if [ ! -d .git ]; then
+            echo "Creating temporary .git in build/web with author $VERCEL_GIT_COMMIT_AUTHOR_NAME <$VERCEL_GIT_COMMIT_AUTHOR_EMAIL>"
+            git init -b main >/dev/null 2>&1 || git init >/dev/null 2>&1
+            git config user.name "$VERCEL_GIT_COMMIT_AUTHOR_NAME"
+            git config user.email "$VERCEL_GIT_COMMIT_AUTHOR_EMAIL"
+            git add -A
+            # Use --author to force the commit author and avoid using runner user's email
+            git commit -m "chore: vercel deployment commit" --author="$VERCEL_GIT_COMMIT_AUTHOR_NAME <$VERCEL_GIT_COMMIT_AUTHOR_EMAIL>" >/dev/null 2>&1 || true
+            # Mark that we created a temp git so we can clean it up after deploy
+            TEMP_GIT_CREATED=1
+          fi
           # Deploy: do not force a scope when org/team id is not provided.
           # Let the Vercel CLI resolve the target using the supplied token and projectId.
           vercel --token "$VERCEL_TOKEN" --yes --prod --debug || {
             echo "Vercel CLI failed with exit code $? -- attempting to print teams/projects for debugging (no token printed)"
             vercel teams ls --token "$VERCEL_TOKEN" || true
             vercel projects ls --token "$VERCEL_TOKEN" || true
+            # cleanup temp git if we created one
+            if [ -n "$TEMP_GIT_CREATED" ]; then
+              rm -rf .git || true
+            fi
             popd
             exit 1
           }
+          # cleanup temp git if we created one
+          if [ -n "$TEMP_GIT_CREATED" ]; then
+            rm -rf .git || true
+          fi
           popd
