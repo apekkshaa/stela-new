@@ -55,18 +55,10 @@ jobs:
           VERCEL_AUTHOR_NAME: ${{ secrets.VERCEL_AUTHOR_NAME }}
           VERCEL_AUTHOR_EMAIL: ${{ secrets.VERCEL_AUTHOR_EMAIL }}
         run: |
-          # Debug: show vercel CLI version and visible teams/projects for the token
+          # Basic environment debug (no secrets printed)
           vercel --version || true
-          echo "== whoami =="
-          vercel whoami --token "$VERCEL_TOKEN" || true
-          echo "== teams (visible) =="
-          vercel teams ls --token "$VERCEL_TOKEN" || true
-          echo "== projects (visible) =="
-          vercel projects ls --token "$VERCEL_TOKEN" || true
 
           # Ensure Vercel sees a commit author that is allowed to deploy to the team.
-          # Prefer explicit secrets VERCEL_AUTHOR_NAME / VERCEL_AUTHOR_EMAIL (set these in repo Secrets).
-          # Fallback to the GitHub actor if secrets are not set (may still be rejected by Vercel).
           if [ -n "$VERCEL_AUTHOR_NAME" ]; then
             export VERCEL_GIT_COMMIT_AUTHOR_NAME="$VERCEL_AUTHOR_NAME"
           else
@@ -81,33 +73,56 @@ jobs:
 
           echo "Using commit author: $VERCEL_GIT_COMMIT_AUTHOR_NAME <$VERCEL_GIT_COMMIT_AUTHOR_EMAIL>"
 
-            # Create a temporary .vercel project mapping so the CLI links to the correct project
-            if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
-              mkdir -p .vercel
-              printf '%s\n' "{\"orgId\": \"$VERCEL_ORG_ID\", \"projectId\": \"$VERCEL_PROJECT_ID\"}" > .vercel/project.json
-              echo "Wrote .vercel/project.json with orgId and projectId"
-            else
-              echo "VERCEL_PROJECT_ID or VERCEL_ORG_ID missing; skipping .vercel/project.json creation"
-            fi
+          # Install jq so we can parse JSON output safely when resolving slugs -> ids
+          sudo apt-get update -y && sudo apt-get install -y jq || true
 
-          # Deploy the already-built static site by project name and scope (team slug).
-          # Use --yes to accept prompts in CI (replaces deprecated --confirm).
-          # Run from inside build/web so the CLI uploads the actual static files (avoids creating .vercel at repo root).
+          # If the provided VERCEL_ORG_ID is a slug (doesn't start with team_ or org_),
+          # try to resolve it to the canonical org/team id using the token.
+          RESOLVED_ORG_ID="$VERCEL_ORG_ID"
+          if [ -n "$VERCEL_ORG_ID" ] && ! echo "$VERCEL_ORG_ID" | grep -E '^team_|^org_' >/dev/null; then
+            echo "VERCEL_ORG_ID appears to be a slug; attempting to resolve with vercel teams ls"
+            TEAMS_JSON=$(vercel teams ls --token "$VERCEL_TOKEN" --json 2>/dev/null || true)
+            if [ -n "$TEAMS_JSON" ]; then
+              MATCHING_ID=$(echo "$TEAMS_JSON" | jq -r --arg slug "$VERCEL_ORG_ID" '.[] | select(.slug==$slug) | .id' | head -n1 || true)
+              if [ -n "$MATCHING_ID" ]; then
+                RESOLVED_ORG_ID="$MATCHING_ID"
+                echo "Resolved VERCEL_ORG_ID slug '$VERCEL_ORG_ID' -> id '$RESOLVED_ORG_ID'"
+              else
+                echo "Could not resolve slug '$VERCEL_ORG_ID' to an org/team id. Available teams (truncated):"
+                echo "$TEAMS_JSON" | jq -c '.[] | {id: .id, slug: .slug, name: .name}' || true
+              fi
+            else
+              echo "vercel teams ls returned no JSON; token might be invalid or lack permissions"
+            fi
+          fi
+
+          # Create a temporary .vercel project mapping so the CLI links to the correct project
+          if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$RESOLVED_ORG_ID" ]; then
+            mkdir -p .vercel
+            printf '%s\n' '{"orgId": "%s", "projectId": "%s"}' "$RESOLVED_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
+            echo "Wrote .vercel/project.json with orgId and projectId (orgId may be resolved from slug)"
+          else
+            echo "VERCEL_PROJECT_ID or resolved org id missing; skipping .vercel/project.json creation"
+          fi
+
+          # List the built files for debugging
           echo "== build/web listing =="
           ls -la build/web || true
           echo "== index.html head (if present) =="
           head -n 30 build/web/index.html || true
 
-          # If a vercel.json exists at repo root, copy it into build/web so the deployed static site uses the same config
+          # Copy vercel.json into build/web so the deployed static site uses the same config
           if [ -f vercel.json ]; then
             echo "Copying vercel.json into build/web so Vercel sees routing config"
             cp vercel.json build/web/
           fi
 
           pushd build/web
-          # Deploy to the explicit Vercel project ID to ensure the alias is updated for `stela-new`.
+          # Deploy; use the slug as --scope (it's acceptable) while the .vercel/project.json contains the canonical org id
           vercel --token "$VERCEL_TOKEN" --yes --prod --debug --scope "apekkshaas-projects" || {
-            echo "Vercel CLI failed with exit code $?"
+            echo "Vercel CLI failed with exit code $? -- attempting to print teams/projects for debugging (no token printed)"
+            vercel teams ls --token "$VERCEL_TOKEN" || true
+            vercel projects ls --token "$VERCEL_TOKEN" || true
             popd
             exit 1
           }
