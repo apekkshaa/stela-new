@@ -24,7 +24,10 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          # Use channel input for tracking the stable channel.
+          # Optionally pin to a concrete SDK version for reproducible builds:
+          # flutter-version: '3.13.0'
+          channel: stable
 
       - name: Install dependencies
         run: flutter pub get
