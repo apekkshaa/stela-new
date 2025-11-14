@@ -82,9 +82,7 @@ jobs:
             # Create a temporary .vercel project mapping so the CLI links to the correct project
             if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
               mkdir -p .vercel
-              cat > .vercel/project.json <<EOF
-  { "orgId": "$VERCEL_ORG_ID", "projectId": "$VERCEL_PROJECT_ID" }
-  EOF
+              printf '%s\n' "{\"orgId\": \"$VERCEL_ORG_ID\", \"projectId\": \"$VERCEL_PROJECT_ID\"}" > .vercel/project.json
               echo "Wrote .vercel/project.json with orgId and projectId"
             else
               echo "VERCEL_PROJECT_ID or VERCEL_ORG_ID missing; skipping .vercel/project.json creation"
