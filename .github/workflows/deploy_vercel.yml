@@ -47,6 +47,8 @@ jobs:
       - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           # Optional: add these two repository secrets so Vercel identifies the commit author
           # VERCEL_AUTHOR_NAME -> the display name of the Vercel user who owns the token
           # VERCEL_AUTHOR_EMAIL -> the email address of that Vercel user (must belong to a team member)
@@ -104,7 +106,7 @@ jobs:
 
           pushd build/web
           # Deploy to the explicit Vercel project ID to ensure the alias is updated for `stela-new`.
-          vercel --token "$VERCEL_TOKEN" --yes --prod --debug --scope "apekkshaas-projects" --project-id "$VERCEL_PROJECT_ID" || {
+          vercel --token "$VERCEL_TOKEN" --yes --prod --debug --scope "apekkshaas-projects" || {
             echo "Vercel CLI failed with exit code $?"
             popd
             exit 1
