@@ -79,6 +79,17 @@ jobs:
 
           echo "Using commit author: $VERCEL_GIT_COMMIT_AUTHOR_NAME <$VERCEL_GIT_COMMIT_AUTHOR_EMAIL>"
 
+            # Create a temporary .vercel project mapping so the CLI links to the correct project
+            if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+              mkdir -p .vercel
+              cat > .vercel/project.json <<EOF
+  { "orgId": "$VERCEL_ORG_ID", "projectId": "$VERCEL_PROJECT_ID" }
+  EOF
+              echo "Wrote .vercel/project.json with orgId and projectId"
+            else
+              echo "VERCEL_PROJECT_ID or VERCEL_ORG_ID missing; skipping .vercel/project.json creation"
+            fi
+
           # Deploy the already-built static site by project name and scope (team slug).
           # Use --yes to accept prompts in CI (replaces deprecated --confirm).
           # Run from inside build/web so the CLI uploads the actual static files (avoids creating .vercel at repo root).
