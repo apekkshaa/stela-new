@@ -38,10 +38,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          # Use Node 20 to match modern CLI engine requirements
+          node-version: '20'
 
       - name: Install Vercel CLI
-        run: npm install -g vercel
+        run: npm install -g vercel@latest
 
       - name: Deploy to Vercel
         env:
@@ -80,4 +81,8 @@ jobs:
 
           # Deploy the already-built static site by project name and scope (team slug).
           # Use --yes to accept prompts in CI (replaces deprecated --confirm).
-          vercel --token "$VERCEL_TOKEN" --yes --prod --cwd build/web --scope "apekkshaas-projects" --name "stela-new"
+          # Use --debug to get verbose logs; remove deprecated --name flag.
+          vercel --token "$VERCEL_TOKEN" --yes --prod --cwd build/web --scope "apekkshaas-projects" --debug || {
+            echo "Vercel CLI failed with exit code $?"
+            exit 1
+          }
