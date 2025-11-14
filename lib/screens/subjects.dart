@@ -6,9 +6,10 @@ import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/profile.dart';
 import 'package:stela_app/screens/login.dart';
 import 'package:stela_app/screens/MyFiles.dart';
-import 'package:stela_app/screens/PythonTutorial.dart';
-import 'package:stela_app/screens/CCTutorial.dart';
-import 'package:stela_app/screens/COATutorial.dart';
+// File names are lowercase/case-sensitive on CI; use exact filenames present in lib/screens
+import 'package:stela_app/screens/pythontutorial.dart';
+import 'package:stela_app/screens/CCtutorial.dart';
+import 'package:stela_app/screens/COAtutorial.dart';
 import 'package:stela_app/screens/student_dashboard.dart';
 import 'package:stela_app/screens/machine_learning_page.dart';
 import 'package:stela_app/screens/wireless_networks_page.dart';
