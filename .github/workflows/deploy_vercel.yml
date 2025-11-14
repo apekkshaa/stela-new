@@ -88,21 +88,65 @@ jobs:
                 RESOLVED_ORG_ID="$MATCHING_ID"
                 echo "Resolved VERCEL_ORG_ID slug '$VERCEL_ORG_ID' -> id '$RESOLVED_ORG_ID'"
               else
-                echo "Could not resolve slug '$VERCEL_ORG_ID' to an org/team id. Available teams (truncated):"
+                echo "Could not resolve slug '$VERCEL_ORG_ID' to an org/team id via teams list. Will try project inspect as a fallback. Available teams (truncated):"
                 echo "$TEAMS_JSON" | jq -c '.[] | {id: .id, slug: .slug, name: .name}' || true
+                # Fallback: inspect the project to obtain its team/org id
+                if [ -n "$VERCEL_PROJECT_ID" ]; then
+                  echo "Attempting to inspect project $VERCEL_PROJECT_ID to discover its owning team/org"
+                  PROJECT_JSON=$(vercel projects inspect "$VERCEL_PROJECT_ID" --token "$VERCEL_TOKEN" --json 2>/dev/null || true)
+                  if [ -n "$PROJECT_JSON" ]; then
+                    # Try common fields that may contain the org/team id
+                    ORG_FROM_PROJECT=$(echo "$PROJECT_JSON" | jq -r '.team.id // .orgId // .ownerId // empty' || true)
+                    if [ -n "$ORG_FROM_PROJECT" ]; then
+                      RESOLVED_ORG_ID="$ORG_FROM_PROJECT"
+                      echo "Resolved org/team id from project inspect: $RESOLVED_ORG_ID"
+                    else
+                      echo "Project inspect did not return a team/org id. Project JSON (truncated):"
+                      echo "$PROJECT_JSON" | jq -c 'del(.env, .builds, .routes, .settings) // .' || true
+                    fi
+                  else
+                    echo "Project inspect returned no JSON; token might lack permissions to view the project."
+                  fi
+                else
+                  echo "No VERCEL_PROJECT_ID set; cannot fallback to project inspect."
+                fi
               fi
             else
-              echo "vercel teams ls returned no JSON; token might be invalid or lack permissions"
+              echo "vercel teams ls returned no JSON; token might be invalid or lack permissions. Trying project inspect fallback."
+              if [ -n "$VERCEL_PROJECT_ID" ]; then
+                PROJECT_JSON=$(vercel projects inspect "$VERCEL_PROJECT_ID" --token "$VERCEL_TOKEN" --json 2>/dev/null || true)
+                if [ -n "$PROJECT_JSON" ]; then
+                  ORG_FROM_PROJECT=$(echo "$PROJECT_JSON" | jq -r '.team.id // .orgId // .ownerId // empty' || true)
+                  if [ -n "$ORG_FROM_PROJECT" ]; then
+                    RESOLVED_ORG_ID="$ORG_FROM_PROJECT"
+                    echo "Resolved org/team id from project inspect: $RESOLVED_ORG_ID"
+                  else
+                    echo "Project inspect did not return a team/org id. Project JSON (truncated):"
+                    echo "$PROJECT_JSON" | jq -c 'del(.env, .builds, .routes, .settings) // .' || true
+                  fi
+                else
+                  echo "Project inspect returned no JSON; token might lack permissions to view the project."
+                fi
+              else
+                echo "No VERCEL_PROJECT_ID set; cannot fallback to project inspect."
+              fi
             fi
           fi
 
           # Create a temporary .vercel project mapping so the CLI links to the correct project
-          if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$RESOLVED_ORG_ID" ]; then
+          if [ -n "$VERCEL_PROJECT_ID" ]; then
             mkdir -p .vercel
-            printf '%s\n' '{"orgId": "%s", "projectId": "%s"}' "$RESOLVED_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
-            echo "Wrote .vercel/project.json with orgId and projectId (orgId may be resolved from slug)"
+            if [ -n "$RESOLVED_ORG_ID" ]; then
+              # We have a canonical org/team id; write both orgId and projectId
+              printf '%s\n' '{"orgId": "%s", "projectId": "%s"}' "$RESOLVED_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
+              echo "Wrote .vercel/project.json with orgId and projectId (orgId may be resolved from slug)"
+            else
+              # No org/team id available; write only projectId to avoid mismatches
+              printf '%s\n' '{"projectId": "%s"}' "$VERCEL_PROJECT_ID" > .vercel/project.json
+              echo "Wrote .vercel/project.json with projectId only (no org/team id available)"
+            fi
           else
-            echo "VERCEL_PROJECT_ID or resolved org id missing; skipping .vercel/project.json creation"
+            echo "VERCEL_PROJECT_ID missing; skipping .vercel/project.json creation"
           fi
 
           # List the built files for debugging
@@ -118,8 +162,9 @@ jobs:
           fi
 
           pushd build/web
-          # Deploy; use the slug as --scope (it's acceptable) while the .vercel/project.json contains the canonical org id
-          vercel --token "$VERCEL_TOKEN" --yes --prod --debug --scope "apekkshaas-projects" || {
+          # Deploy: do not force a scope when org/team id is not provided.
+          # Let the Vercel CLI resolve the target using the supplied token and projectId.
+          vercel --token "$VERCEL_TOKEN" --yes --prod --debug || {
             echo "Vercel CLI failed with exit code $? -- attempting to print teams/projects for debugging (no token printed)"
             vercel teams ls --token "$VERCEL_TOKEN" || true
             vercel projects ls --token "$VERCEL_TOKEN" || true
