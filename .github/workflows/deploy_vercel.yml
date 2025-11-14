@@ -81,8 +81,16 @@ jobs:
 
           # Deploy the already-built static site by project name and scope (team slug).
           # Use --yes to accept prompts in CI (replaces deprecated --confirm).
-          # Use --debug to get verbose logs; remove deprecated --name flag.
-          vercel --token "$VERCEL_TOKEN" --yes --prod --cwd build/web --scope "apekkshaas-projects" --debug || {
+          # Run from inside build/web so the CLI uploads the actual static files (avoids creating .vercel at repo root).
+          echo "== build/web listing =="
+          ls -la build/web || true
+          echo "== index.html head (if present) =="
+          head -n 30 build/web/index.html || true
+
+          pushd build/web
+          vercel --token "$VERCEL_TOKEN" --yes --prod --debug --scope "apekkshaas-projects" || {
             echo "Vercel CLI failed with exit code $?"
+            popd
             exit 1
           }
+          popd
