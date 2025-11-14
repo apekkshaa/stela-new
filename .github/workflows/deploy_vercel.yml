@@ -94,7 +94,8 @@ jobs:
           fi
 
           pushd build/web
-          vercel --token "$VERCEL_TOKEN" --yes --prod --debug --scope "apekkshaas-projects" || {
+          # Deploy to the explicit Vercel project ID to ensure the alias is updated for `stela-new`.
+          vercel --token "$VERCEL_TOKEN" --yes --prod --debug --scope "apekkshaas-projects" --project-id "$VERCEL_PROJECT_ID" || {
             echo "Vercel CLI failed with exit code $?"
             popd
             exit 1
