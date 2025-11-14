@@ -87,6 +87,12 @@ jobs:
           echo "== index.html head (if present) =="
           head -n 30 build/web/index.html || true
 
+          # If a vercel.json exists at repo root, copy it into build/web so the deployed static site uses the same config
+          if [ -f vercel.json ]; then
+            echo "Copying vercel.json into build/web so Vercel sees routing config"
+            cp vercel.json build/web/
+          fi
+
           pushd build/web
           vercel --token "$VERCEL_TOKEN" --yes --prod --debug --scope "apekkshaas-projects" || {
             echo "Vercel CLI failed with exit code $?"
