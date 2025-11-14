@@ -46,8 +46,17 @@ jobs:
       - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          # Deploy the already-built static site
-          vercel --token "$VERCEL_TOKEN" --confirm --prod --cwd build/web --scope "apekkshaas-projects"
+          # Debug: show vercel CLI version and visible teams/projects for the token
+          vercel --version || true
+          echo "== whoami =="
+          vercel whoami --token "$VERCEL_TOKEN" || true
+          echo "== teams (visible) =="
+          vercel teams ls --token "$VERCEL_TOKEN" || true
+          echo "== projects (visible) =="
+          vercel projects ls --token "$VERCEL_TOKEN" || true
+
+          # Deploy the already-built static site by project name and scope (team slug).
+          # Use --yes to accept prompts in CI (replaces deprecated --confirm).
+          # Replace the --scope value with your exact team slug if different.
+          vercel --token "$VERCEL_TOKEN" --yes --prod --cwd build/web --scope "apekkshaas-projects" --name "stela-new"
