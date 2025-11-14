@@ -46,6 +46,11 @@ jobs:
       - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          # Optional: add these two repository secrets so Vercel identifies the commit author
+          # VERCEL_AUTHOR_NAME -> the display name of the Vercel user who owns the token
+          # VERCEL_AUTHOR_EMAIL -> the email address of that Vercel user (must belong to a team member)
+          VERCEL_AUTHOR_NAME: ${{ secrets.VERCEL_AUTHOR_NAME }}
+          VERCEL_AUTHOR_EMAIL: ${{ secrets.VERCEL_AUTHOR_EMAIL }}
         run: |
           # Debug: show vercel CLI version and visible teams/projects for the token
           vercel --version || true
@@ -56,7 +61,23 @@ jobs:
           echo "== projects (visible) =="
           vercel projects ls --token "$VERCEL_TOKEN" || true
 
+          # Ensure Vercel sees a commit author that is allowed to deploy to the team.
+          # Prefer explicit secrets VERCEL_AUTHOR_NAME / VERCEL_AUTHOR_EMAIL (set these in repo Secrets).
+          # Fallback to the GitHub actor if secrets are not set (may still be rejected by Vercel).
+          if [ -n "$VERCEL_AUTHOR_NAME" ]; then
+            export VERCEL_GIT_COMMIT_AUTHOR_NAME="$VERCEL_AUTHOR_NAME"
+          else
+            export VERCEL_GIT_COMMIT_AUTHOR_NAME="$GITHUB_ACTOR"
+          fi
+
+          if [ -n "$VERCEL_AUTHOR_EMAIL" ]; then
+            export VERCEL_GIT_COMMIT_AUTHOR_EMAIL="$VERCEL_AUTHOR_EMAIL"
+          else
+            export VERCEL_GIT_COMMIT_AUTHOR_EMAIL="$GITHUB_ACTOR@users.noreply.github.com"
+          fi
+
+          echo "Using commit author: $VERCEL_GIT_COMMIT_AUTHOR_NAME <$VERCEL_GIT_COMMIT_AUTHOR_EMAIL>"
+
           # Deploy the already-built static site by project name and scope (team slug).
           # Use --yes to accept prompts in CI (replaces deprecated --confirm).
-          # Replace the --scope value with your exact team slug if different.
           vercel --token "$VERCEL_TOKEN" --yes --prod --cwd build/web --scope "apekkshaas-projects" --name "stela-new"
