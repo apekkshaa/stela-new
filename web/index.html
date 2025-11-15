@@ -75,7 +75,10 @@
       function sendView(url) {
         try {
           var endpoint = '/_vercel/insights/view';
-          var payload = JSON.stringify({ url: url || (location.pathname + location.search) });
+          // Vercel's /_vercel/insights/view expects a top-level `o` object.
+          // Include both `url` and `u` inside `o` to be resilient to expected shapes.
+          var payloadObj = { o: { url: url || (location.pathname + location.search), u: url || (location.pathname + location.search) } };
+          var payload = JSON.stringify(payloadObj);
           console.debug('[Vercel Analytics] sendView ->', payload);
           if (navigator.sendBeacon) {
             try {
