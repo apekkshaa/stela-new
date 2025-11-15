@@ -320,6 +320,8 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
         'percentage': percentage,
         'timeTakenSeconds': timeTaken.inSeconds,
         'timestamp': FieldValue.serverTimestamp(),
+        // mark as sent to faculty immediately when student submits
+        'sentToFaculty': FieldValue.serverTimestamp(),
         // store the quiz data so faculty can review questions with answers
         'quizData': widget.quiz,
       };
@@ -342,7 +344,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       // Show brief confirmation to student (non-blocking)
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Quiz submitted successfully')),
+          SnackBar(content: Text('Quiz submitted successfully — results sent to faculty')),
         );
       }
     } catch (e) {

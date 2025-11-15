@@ -54,5 +54,89 @@
       });
     });
   </script>
+
+  <!-- Vercel Web Analytics (minimal integration for non-Next.js / SPA sites) -->
+  <!--
+    This snippet sends a page-view to Vercel's built-in analytics endpoint
+    (`/_vercel/insights/view`) on initial load and on client-side navigation
+    (history.pushState / popstate). It uses navigator.sendBeacon when available
+    and falls back to fetch with keepalive. Events are skipped on localhost.
+
+    Notes:
+    - Enable Web Analytics for your project in the Vercel dashboard first.
+    - This will only report after you deploy to Vercel (analytics are disabled
+      in development mode/localhost).
+  -->
+  <script>
+    (function() {
+      // Don't track in local development
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+
+      function sendView(url) {
+        try {
+          var endpoint = '/_vercel/insights/view';
+          var payload = JSON.stringify({ url: url || (location.pathname + location.search) });
+          if (navigator.sendBeacon) {
+            // sendBeacon accepts a URL and ArrayBuffer/Blob/String etc.
+            navigator.sendBeacon(endpoint, payload);
+            return;
+          }
+          // Fallback: use keepalive fetch so it can be sent when navigating away
+          fetch(endpoint, {
+            method: 'POST',
+            keepalive: true,
+            headers: { 'Content-Type': 'application/json' },
+            body: payload
+          }).catch(function(){});
+        } catch (e) {
+          // silent
+        }
+      }
+
+      // Initial page view
+      sendView();
+
+      // Hook history.pushState to track SPA navigations
+      var _pushState = history.pushState;
+      history.pushState = function() {
+        var ret = _pushState.apply(this, arguments);
+        // arguments[2] is the URL passed to pushState
+        try { sendView(arguments[2] || location.pathname + location.search); } catch (e) {}
+        return ret;
+      };
+
+      // Also listen for back/forward navigation
+      window.addEventListener('popstate', function() {
+        sendView(location.pathname + location.search);
+      });
+    })();
+  </script>
+
+  <!-- Vercel Speed Insights (minimal integration for static / non-Next apps) -->
+  <!--
+    This will load the Speed Insights script that Vercel exposes at
+    /_vercel/speed-insights/script.js after you enable Speed Insights in the
+    Vercel dashboard and deploy. The script collects web vitals and other
+    performance metrics and sends them to Vercel.
+
+    Notes:
+    - Enable Speed Insights for the project in the Vercel dashboard first.
+    - The script is served from Vercel after enabling and deployment; locally
+      it may 404 which is harmless. We skip loading on localhost to avoid
+      development noise.
+  -->
+  <script>
+    (function() {
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+      try {
+        var s = document.createElement('script');
+        s.defer = true;
+        s.src = '/_vercel/speed-insights/script.js';
+        document.body.appendChild(s);
+      } catch (e) {
+        // silent
+      }
+    })();
+  </script>
 </body>
 </html>

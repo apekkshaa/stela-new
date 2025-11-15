@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import '../constants/colors.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'faculty_quiz_taking_screen.dart';
 
 class QuizResultsScreen extends StatefulWidget {
   final Map<String, dynamic> quiz;
@@ -29,25 +26,6 @@ class QuizResultsScreen extends StatefulWidget {
 }
 
 class _QuizResultsScreenState extends State<QuizResultsScreen> {
-  bool _sending = false;
-
-  Future<void> _sendResultsToFaculty() async {
-    if (widget.submissionDocId == null || widget.submissionDocId!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No submission id available to send')));
-      return;
-    }
-    setState(() { _sending = true; });
-    try {
-      final docRef = FirebaseFirestore.instance.collection('quiz_submissions').doc(widget.submissionDocId);
-      await docRef.update({'sentToFaculty': FieldValue.serverTimestamp()});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Results sent to faculty')));
-    } catch (e) {
-      print('Error sending results to faculty: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send results: $e')));
-    } finally {
-      setState(() { _sending = false; });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -234,34 +212,24 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
                               onPressed: () {
                                 Navigator.pop(context); // Go back to subject detail
                               },
-                              icon: Icon(Icons.home),
+                              icon: Icon(Icons.home, size: 20),
                               label: Text(
                                 'Back to Subject',
-                                style: TextStyle(fontFamily: 'PTSerif'),
+                                style: TextStyle(fontFamily: 'PTSerif', fontSize: 15, fontWeight: FontWeight.w600),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: widget.subject['color'],
                                 foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(vertical: 12),
+                                padding: EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
+                                elevation: 2,
                               ),
                             ),
                             SizedBox(height: 8),
-                            ElevatedButton.icon(
-                              onPressed: _sending ? null : _sendResultsToFaculty,
-                              icon: Icon(Icons.send),
-                              label: Text('Send results to faculty', style: TextStyle(fontFamily: 'PTSerif')),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
+                            // Manual "send to faculty" button removed because submissions
+                            // are now automatically marked as sent at submission time.
                           ],
                         ),
                       ),
