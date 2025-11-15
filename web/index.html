@@ -88,6 +88,13 @@
             headers: { 'Content-Type': 'application/json' },
             body: payload
           }).catch(function(){});
+          // Additional fallback: fire an image GET request so servers that expect
+          // a simple GET are still hit. This helps when POSTs are blocked or
+          // when a different payload format is expected by the platform.
+          try {
+            var img = new Image(1,1);
+            img.src = endpoint + '?url=' + encodeURIComponent(url || (location.pathname + location.search));
+          } catch (e) {}
         } catch (e) {
           // silent
         }
