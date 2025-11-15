@@ -76,25 +76,45 @@
         try {
           var endpoint = '/_vercel/insights/view';
           var payload = JSON.stringify({ url: url || (location.pathname + location.search) });
+          console.debug('[Vercel Analytics] sendView ->', payload);
           if (navigator.sendBeacon) {
-            // sendBeacon accepts a URL and ArrayBuffer/Blob/String etc.
-            navigator.sendBeacon(endpoint, payload);
-            return;
+            try {
+              // Use a Blob to ensure content-type is application/json where supported
+              var b = new Blob([payload], { type: 'application/json' });
+              var ok = navigator.sendBeacon(endpoint, b);
+              console.debug('[Vercel Analytics] sendBeacon result:', ok);
+              if (ok) return;
+            } catch (e) {
+              console.debug('[Vercel Analytics] sendBeacon error', e);
+            }
           }
+
           // Fallback: use keepalive fetch so it can be sent when navigating away
-          fetch(endpoint, {
-            method: 'POST',
-            keepalive: true,
-            headers: { 'Content-Type': 'application/json' },
-            body: payload
-          }).catch(function(){});
+          try {
+            fetch(endpoint, {
+              method: 'POST',
+              keepalive: true,
+              headers: { 'Content-Type': 'application/json' },
+              body: payload,
+              mode: 'cors'
+            }).then(function(res) {
+              console.debug('[Vercel Analytics] fetch result', res && res.status);
+            }).catch(function(err){
+              console.debug('[Vercel Analytics] fetch error', err);
+            });
+          } catch (e) {
+            console.debug('[Vercel Analytics] fetch exception', e);
+          }
+
           // Additional fallback: fire an image GET request so servers that expect
           // a simple GET are still hit. This helps when POSTs are blocked or
           // when a different payload format is expected by the platform.
           try {
             var img = new Image(1,1);
+            img.onload = function(){ console.debug('[Vercel Analytics] image GET succeeded'); };
+            img.onerror = function(){ console.debug('[Vercel Analytics] image GET failed'); };
             img.src = endpoint + '?url=' + encodeURIComponent(url || (location.pathname + location.search));
-          } catch (e) {}
+          } catch (e) { console.debug('[Vercel Analytics] image fallback error', e); }
         } catch (e) {
           // silent
         }
@@ -108,7 +128,11 @@
       history.pushState = function() {
         var ret = _pushState.apply(this, arguments);
         // arguments[2] is the URL passed to pushState
-        try { sendView(arguments[2] || location.pathname + location.search); } catch (e) {}
+        try {
+          var newUrl = arguments[2] || (location.pathname + location.search);
+          console.debug('[Vercel Analytics] pushState ->', newUrl);
+          sendView(newUrl);
+        } catch (e) { console.debug('[Vercel Analytics] pushState error', e); }
         return ret;
       };
 
