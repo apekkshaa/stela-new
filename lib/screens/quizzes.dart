@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/subject_detail.dart';
@@ -677,8 +678,12 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
   }
 
   void _shuffleMcqs() {
-    final rand = Random();
-    // Shuffle options inside each question and update correct index
+    // Determine base seed from user id and quiz id so shuffle differs per user
+    String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    String quizId = (widget.quiz['id'] ?? widget.quiz['key'] ?? '').toString();
+    int baseSeed = uid.isNotEmpty ? _stableSeed(uid + '::' + quizId) : DateTime.now().millisecondsSinceEpoch;
+
+    // Shuffle options inside each question and update correct index using question-specific seed
     for (int i = 0; i < _mcqs.length; i++) {
       final q = Map<String, dynamic>.from(_mcqs[i]);
       final List opts = List.from(q['options'] ?? q['choices'] ?? []);
@@ -686,7 +691,8 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
 
       final List<Map<String, dynamic>> paired = [];
       for (int j = 0; j < opts.length; j++) paired.add({'text': opts[j], 'orig': j});
-      paired.shuffle(rand);
+
+      paired.shuffle(Random(baseSeed + i));
       final List newOptions = paired.map((p) => p['text']).toList();
       final int newCorrect = paired.indexWhere((p) => p['orig'] == correctIndex);
 
@@ -696,8 +702,16 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
       _mcqs[i] = q;
     }
 
-    // Shuffle question order
-    _mcqs.shuffle(rand);
+    // Shuffle question order using baseSeed to make question ordering stable per user
+    _mcqs.shuffle(Random(baseSeed ^ 0x9e3779b1));
+  }
+
+  int _stableSeed(String s) {
+    int h = 0;
+    for (int i = 0; i < s.length; i++) {
+      h = (h * 31 + s.codeUnitAt(i)) & 0x7fffffff;
+    }
+    return h;
   }
 
   void _finish() {

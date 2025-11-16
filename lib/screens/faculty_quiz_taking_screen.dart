@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:async';
 import 'dart:math';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'quiz_results_screen.dart';
 
 class FacultyQuizTakingScreen extends StatefulWidget {
@@ -61,7 +62,16 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
   /// Shuffle the questions list and shuffle options within each question.
   /// Uses a time-seeded Random to ensure different users/attempts get different orders.
   void _shuffleQuestionsAndOptions() {
-    final rand = Random();
+    // Create a deterministic seed per user+quiz so each user gets a unique order
+    String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    String quizId = (widget.quiz['id'] ?? widget.quiz['key'] ?? '').toString();
+
+    int baseSeed;
+    if (uid.isNotEmpty) {
+      baseSeed = _stableSeed(uid + '::' + quizId);
+    } else {
+      baseSeed = DateTime.now().millisecondsSinceEpoch;
+    }
 
     // Shuffle options for each question while keeping track of the correct index
     for (int i = 0; i < questions.length; i++) {
@@ -75,7 +85,8 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
         paired.add({'text': opts[j], 'orig': j});
       }
 
-      // Shuffle paired options
+      // Use question-specific seed so options vary across questions
+      final rand = Random(baseSeed + i);
       paired.shuffle(rand);
 
       // Build new options list and find new correct index
@@ -88,8 +99,17 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       questions[i] = q;
     }
 
-    // Finally, shuffle question order itself
-    questions.shuffle(rand);
+    // Finally, shuffle question order itself using the base seed so it's stable per-user
+    questions.shuffle(Random(baseSeed ^ 0x9e3779b1));
+  }
+
+  int _stableSeed(String s) {
+    // Simple deterministic hash to produce a non-negative int seed
+    int h = 0;
+    for (int i = 0; i < s.length; i++) {
+      h = (h * 31 + s.codeUnitAt(i)) & 0x7fffffff;
+    }
+    return h;
   }
 
   Future<void> _checkExistingSubmission() async {
