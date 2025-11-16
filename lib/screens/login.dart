@@ -392,9 +392,16 @@ class _LoginState extends State<Login> {
   void _showResetPasswordDialog(BuildContext context) {
     String resetEmail = '';
 
+    // Capture the parent context (the one that contains the Scaffold) so
+    // we can show a SnackBar after closing the dialog. The dialog's
+    // builder provides a new context that is NOT a descendant of the
+    // page's Scaffold, so calling ScaffoldMessenger.of(dialogContext)
+    // would fail.
+    final parentContext = context;
+
     showDialog(
       context: context,
-      builder: (_) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: Text("Reset Password"),
           content: TextField(
@@ -409,20 +416,44 @@ class _LoginState extends State<Login> {
               child: Text("Send"),
               onPressed: () async {
                 if (resetEmail.isEmpty || !resetEmail.contains('@')) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
                       SnackBar(content: Text("Enter a valid email address.")));
                   return;
                 }
-                await _auth.sendPasswordResetEmail(email: resetEmail);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Reset link sent to $resetEmail")));
+
+                try {
+                  // Check whether an account exists for this email. If there
+                  // are no providers returned, there's no user registered with
+                  // that email and Firebase may not send a reset link.
+                  final methods = await _auth.fetchSignInMethodsForEmail(resetEmail);
+                  if (methods.isEmpty) {
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                        SnackBar(content: Text("No account found for $resetEmail")));
+                    return;
+                  }
+
+                  await _auth.sendPasswordResetEmail(email: resetEmail);
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                      SnackBar(content: Text("Reset link sent to $resetEmail")));
+                } on FirebaseAuthException catch (e) {
+                  Navigator.pop(dialogContext);
+                  // Show the FirebaseAuthException message which is more
+                  // descriptive (e.g. user-not-found, invalid-email, etc.).
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                      SnackBar(content: Text("Failed to send reset link: ${e.message}")));
+                } catch (e) {
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                      SnackBar(content: Text("Failed to send reset link: $e")));
+                }
               },
             ),
             TextButton(
               child: Text("Cancel"),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
             ),
           ],
         );
