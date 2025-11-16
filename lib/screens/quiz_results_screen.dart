@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class QuizResultsScreen extends StatefulWidget {
   final Map<String, dynamic> quiz;
@@ -228,8 +229,34 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
                               ),
                             ),
                             SizedBox(height: 8),
-                            // Manual "send to faculty" button removed because submissions
-                            // are now automatically marked as sent at submission time.
+                            // Feedback button
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final uri = Uri.parse('https://docs.google.com/forms/d/e/1FAIpQLSe4S0tVb06rrhOYuMaBdAfJaH0UtUslYvfTQcWw67feXAOeLw/viewform?usp=dialog');
+                                try {
+                                  if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open feedback form.')));
+                                  }
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening feedback form.')));
+                                }
+                              },
+                              icon: Icon(Icons.feedback, size: 20),
+                              label: Text(
+                                'Give Feedback',
+                                style: TextStyle(fontFamily: 'PTSerif', fontSize: 15, fontWeight: FontWeight.w600),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: widget.subject['color'],
+                                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(color: widget.subject['color']),
+                                ),
+                                elevation: 0,
+                              ),
+                            ),
                           ],
                         ),
                       ),
