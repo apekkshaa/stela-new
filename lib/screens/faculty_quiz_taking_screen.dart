@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:async';
+import 'dart:math';
 import 'quiz_results_screen.dart';
 
 class FacultyQuizTakingScreen extends StatefulWidget {
@@ -39,6 +40,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
 
   void _initializeQuiz() {
     questions = List<Map<String, dynamic>>.from(widget.quiz['facultyQuestions'] ?? []);
+
+    // Shuffle questions and options so each user sees a random order
+    _shuffleQuestionsAndOptions();
     
     // Parse duration and set timer
     String duration = widget.quiz['duration'] ?? '15 min';
@@ -52,6 +56,40 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     _startTimer();
     // Check if the current user has already submitted this quiz
     _checkExistingSubmission();
+  }
+
+  /// Shuffle the questions list and shuffle options within each question.
+  /// Uses a time-seeded Random to ensure different users/attempts get different orders.
+  void _shuffleQuestionsAndOptions() {
+    final rand = Random();
+
+    // Shuffle options for each question while keeping track of the correct index
+    for (int i = 0; i < questions.length; i++) {
+      final q = Map<String, dynamic>.from(questions[i]);
+      final List<String> opts = List<String>.from(q['options'] ?? []);
+      final int correctIndex = q['correct'] ?? 0;
+
+      // Pair option text with original index
+      final List<Map<String, dynamic>> paired = [];
+      for (int j = 0; j < opts.length; j++) {
+        paired.add({'text': opts[j], 'orig': j});
+      }
+
+      // Shuffle paired options
+      paired.shuffle(rand);
+
+      // Build new options list and find new correct index
+      final List<String> newOptions = paired.map((p) => p['text'] as String).toList();
+      final int newCorrect = paired.indexWhere((p) => p['orig'] == correctIndex);
+
+      q['options'] = newOptions;
+      q['correct'] = newCorrect >= 0 ? newCorrect : 0;
+
+      questions[i] = q;
+    }
+
+    // Finally, shuffle question order itself
+    questions.shuffle(rand);
   }
 
   Future<void> _checkExistingSubmission() async {
@@ -324,6 +362,8 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
         'sentToFaculty': FieldValue.serverTimestamp(),
         // store the quiz data so faculty can review questions with answers
         'quizData': widget.quiz,
+        // store the exact question/option order used for this attempt
+        'attemptQuestions': List.from(questions.map((q) => Map<String, dynamic>.from(q)).toList()),
       };
 
     final docRef = await FirebaseFirestore.instance.collection('quiz_submissions').add(submission);

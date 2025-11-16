@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/subject_detail.dart';
@@ -639,6 +640,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
   late AnimationController _questionController;
   late Animation<double> _progressAnimation;
   late Animation<Offset> _slideAnimation;
+  List<Map<String, dynamic>> _mcqs = [];
 
   @override
   void initState() {
@@ -658,6 +660,10 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
     
     _progressController.forward();
     _questionController.forward();
+  // Prepare shuffled MCQs for this attempt
+  final raw = (widget.quiz['sections']?['mcq'] ?? []) as List;
+  _mcqs = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  _shuffleMcqs();
     
     _timer = Timer.periodic(Duration(seconds: 1), (t) {
       if (!mounted) return;
@@ -670,18 +676,41 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
     });
   }
 
+  void _shuffleMcqs() {
+    final rand = Random();
+    // Shuffle options inside each question and update correct index
+    for (int i = 0; i < _mcqs.length; i++) {
+      final q = Map<String, dynamic>.from(_mcqs[i]);
+      final List opts = List.from(q['options'] ?? q['choices'] ?? []);
+      final int correctIndex = q['correct'] ?? 0;
+
+      final List<Map<String, dynamic>> paired = [];
+      for (int j = 0; j < opts.length; j++) paired.add({'text': opts[j], 'orig': j});
+      paired.shuffle(rand);
+      final List newOptions = paired.map((p) => p['text']).toList();
+      final int newCorrect = paired.indexWhere((p) => p['orig'] == correctIndex);
+
+      // Update fields used by this UI
+      q['options'] = newOptions;
+      q['correct'] = newCorrect >= 0 ? newCorrect : 0;
+      _mcqs[i] = q;
+    }
+
+    // Shuffle question order
+    _mcqs.shuffle(rand);
+  }
+
   void _finish() {
     _timer?.cancel();
-    final mcqs = (widget.quiz['sections']?['mcq'] ?? []) as List;
     int score = 0;
-    for (int i = 0; i < mcqs.length; i++) if (answers[i] == mcqs[i]['correct']) score++;
+    for (int i = 0; i < _mcqs.length; i++) if (answers[i] == _mcqs[i]['correct']) score++;
 
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => QuizResultScreen(
           score: score,
-          total: mcqs.length,
+          total: _mcqs.length,
           quizTitle: widget.quiz['title'] ?? 'Quiz',
           quizColor: widget.quiz['color'] ?? primaryButton,
         ),
@@ -693,8 +722,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
   }
 
   void _nextQuestion() {
-    final mcqs = (widget.quiz['sections']?['mcq'] ?? []) as List;
-    if (current < mcqs.length - 1) {
+    if (current < _mcqs.length - 1) {
       _questionController.reset();
       setState(() => current++);
       _questionController.forward();
@@ -723,10 +751,9 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final mcqs = (widget.quiz['sections']?['mcq'] ?? []) as List;
-    if (mcqs.isEmpty) return Scaffold(body: Center(child: Text('No questions')));
-    final q = mcqs[current];
-    final quizColor = widget.quiz['color'] ?? primaryButton;
+  if (_mcqs.isEmpty) return Scaffold(body: Center(child: Text('No questions')));
+  final q = _mcqs[current];
+  final quizColor = widget.quiz['color'] ?? primaryButton;
 
     return Scaffold(
       backgroundColor: primaryWhite,
@@ -785,7 +812,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Question ${current + 1} of ${mcqs.length}',
+                      'Question ${current + 1} of ${_mcqs.length}',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 16,
@@ -793,7 +820,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                       ),
                     ),
                     Text(
-                      '${((current + 1) / mcqs.length * 100).round()}%',
+                      '${((current + 1) / _mcqs.length * 100).round()}%',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -804,7 +831,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                 ),
                 SizedBox(height: 12),
                 LinearProgressIndicator(
-                  value: (current + 1) / mcqs.length,
+                  value: (current + 1) / _mcqs.length,
                   backgroundColor: Colors.white.withOpacity(0.3),
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   minHeight: 6,
@@ -983,8 +1010,8 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                       ),
                       elevation: 4,
                     ),
-                    child: Text(
-                      current < mcqs.length - 1 ? 'Next Question' : 'Submit Quiz',
+                      child: Text(
+                      current < _mcqs.length - 1 ? 'Next Question' : 'Submit Quiz',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
