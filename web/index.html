@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -19,7 +20,7 @@
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-M9MEEYZP72"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
+    function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
     gtag('config', 'G-M9MEEYZP72');
   </script>
@@ -35,7 +36,7 @@
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" type="image/png" href="favicon.png" />
 
   <title>stela_app</title>
   <link rel="manifest" href="manifest.json">
@@ -47,17 +48,18 @@
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
 </head>
+
 <body>
   <script>
-    window.addEventListener('load', function(ev) {
+    window.addEventListener('load', function (ev) {
       // Download main.dart.js
       _flutter.loader.loadEntrypoint({
         serviceWorker: {
           serviceWorkerVersion: serviceWorkerVersion,
         }
-      }).then(function(engineInitializer) {
+      }).then(function (engineInitializer) {
         return engineInitializer.initializeEngine();
-      }).then(function(appRunner) {
+      }).then(function (appRunner) {
         return appRunner.runApp();
       });
     });
@@ -76,7 +78,7 @@
       in development mode/localhost).
   -->
   <script>
-    (function() {
+    (function () {
       // Don't track in local development
       if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
 
@@ -109,9 +111,9 @@
               headers: { 'Content-Type': 'application/json' },
               body: payload,
               mode: 'cors'
-            }).then(function(res) {
+            }).then(function (res) {
               console.debug('[Vercel Analytics] fetch result', res && res.status);
-            }).catch(function(err){
+            }).catch(function (err) {
               console.debug('[Vercel Analytics] fetch error', err);
             });
           } catch (e) {
@@ -122,9 +124,9 @@
           // a simple GET are still hit. This helps when POSTs are blocked or
           // when a different payload format is expected by the platform.
           try {
-            var img = new Image(1,1);
-            img.onload = function(){ console.debug('[Vercel Analytics] image GET succeeded'); };
-            img.onerror = function(){ console.debug('[Vercel Analytics] image GET failed'); };
+            var img = new Image(1, 1);
+            img.onload = function () { console.debug('[Vercel Analytics] image GET succeeded'); };
+            img.onerror = function () { console.debug('[Vercel Analytics] image GET failed'); };
             img.src = endpoint + '?url=' + encodeURIComponent(fullUrl);
           } catch (e) { console.debug('[Vercel Analytics] image fallback error', e); }
         } catch (e) {
@@ -137,7 +139,7 @@
 
       // Hook history.pushState to track SPA navigations
       var _pushState = history.pushState;
-      history.pushState = function() {
+      history.pushState = function () {
         var ret = _pushState.apply(this, arguments);
         // arguments[2] is the URL passed to pushState
         try {
@@ -150,7 +152,7 @@
       };
 
       // Also listen for back/forward navigation
-      window.addEventListener('popstate', function() {
+      window.addEventListener('popstate', function () {
         sendView(location.pathname + location.search);
       });
     })();
@@ -170,7 +172,7 @@
       development noise.
   -->
   <script>
-    (function() {
+    (function () {
       if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
       try {
         var s = document.createElement('script');
@@ -183,4 +185,5 @@
     })();
   </script>
 </body>
+
 </html>
