@@ -86,6 +86,20 @@ final List<Map<String, dynamic>> facultySubjects = [
     ],
   },
   {
+    "label": "Theory of Computation",
+    "value": "theory_of_computation",
+    "icon": Icons.functions,
+    "description": "Study automata, formal languages, computability, and complexity",
+    "color": Colors.indigo,
+    "category": "Core Systems",
+    "units": [
+      {"name": "Unit 1"},
+      {"name": "Unit 2"},
+      {"name": "Unit 3"},
+      {"name": "Unit 4"},
+    ],
+  },
+  {
     "label": "Wireless Networks",
     "value": "wireless_networks",
     "icon": Icons.wifi,

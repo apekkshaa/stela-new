@@ -17,6 +17,7 @@ import 'package:stela_app/screens/compiler_design_page.dart';
 import 'package:stela_app/screens/computer_networks_page.dart';
 import 'package:stela_app/screens/internet_of_things_page.dart';
 import 'package:stela_app/screens/c_programming_page.dart';
+import 'package:stela_app/screens/theory_of_computation_page.dart';
 String usermanual1 =
     "https://docs.google.com/document/d/1-55-CJP_Be6KlZgdGFk6K_j7sFQeqGulqfCrZPD2bcA/edit?usp=sharing";
 String feedback =
@@ -77,6 +78,14 @@ class _SubjectsState extends State<Subjects> {
       "category": "Core Subjects",
       "color": Colors.deepPurple,
       "widget": MachineLearningPage(), // Uncomment and import if you have a page for this
+    },
+    {
+      "label": "Theory of Computation",
+      "icon": Icons.functions,
+      "description": "Study automata, formal languages, computability, and complexity",
+      "category": "Core Subjects",
+      "color": Colors.indigo,
+      "widget": TheoryOfComputationPage(),
     },
     // --- Add Wireless Networks subject ---
     {

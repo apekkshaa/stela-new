@@ -12,6 +12,7 @@ class QuizzesClean extends StatelessWidget {
     {'id': 'cloud', 'title': 'Cloud Computing', 'icon': Icons.cloud},
     {'id': 'ai', 'title': 'Artificial Intelligence', 'icon': Icons.memory},
     {'id': 'cprog', 'title': 'C Programming', 'icon': Icons.computer},
+    {'id': 'theory_of_computation', 'title': 'Theory of Computation', 'icon': Icons.functions},
   ];
 
   @override

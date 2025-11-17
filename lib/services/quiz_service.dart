@@ -105,6 +105,7 @@ class QuizService {
       'machine_learning': 'Machine_Learning',
       'wireless_networks': 'Wireless_Networks',
       'internet_of_things': 'Internet_of_Things',
+      'theory_of_computation': 'Theory_of_Computation',
       'c_programming': 'C_Programming',
     };
     
@@ -134,6 +135,8 @@ class QuizService {
       'wireless_networks': 'Wireless_Networks',
       'iot': 'Internet_of_Things',
       'internet_of_things': 'Internet_of_Things',
+      'theory_of_computation': 'Theory_of_Computation',
+      'toc': 'Theory_of_Computation',
       'c_programming': 'C_Programming',
     };
     

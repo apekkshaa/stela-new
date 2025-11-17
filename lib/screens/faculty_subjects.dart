@@ -41,6 +41,12 @@ class FacultySubjects extends StatelessWidget {
       "color": Colors.deepPurple,
     },
     {
+      "label": "Theory of Computation",
+      "icon": Icons.functions,
+      "description": "Study automata, formal languages, computability, and complexity",
+      "color": Colors.indigo,
+    },
+    {
       "label": "Wireless Networks",
       "icon": Icons.wifi,
       "description": "Study wireless communication and networking",

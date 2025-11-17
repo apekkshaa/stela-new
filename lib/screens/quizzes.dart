@@ -103,6 +103,19 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
       ]
     },
     {
+      'id': 'theory_of_computation',
+      'title': 'Theory of Computation',
+      'icon': Icons.functions,
+      'color': Colors.indigo,
+      'category': 'Core Systems',
+      'units': [
+        {'name': 'Unit 1', 'topics': ['Automata Theory', 'Finite Automata', 'Regular Languages']},
+        {'name': 'Unit 2', 'topics': ['Context-Free Languages', 'Pushdown Automata', 'Parsing']},
+        {'name': 'Unit 3', 'topics': ['Turing Machines', 'Decidability', 'Reducibility']},
+        {'name': 'Unit 4', 'topics': ['Complexity Theory', 'P vs NP', 'Approximation Algorithms']},
+      ]
+    },
+    {
       'id': 'wireless_networks', 
       'title': 'Wireless Networks', 
       'icon': Icons.wifi, 
