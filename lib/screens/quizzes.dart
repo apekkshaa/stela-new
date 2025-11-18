@@ -139,6 +139,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> with SingleTickerProvider
         {'name': 'Unit 2', 'topics': ['Communication Protocols', 'MQTT', 'CoAP']},
         {'name': 'Unit 3', 'topics': ['IoT Platforms', 'Cloud Integration', 'Data Analytics']},
         {'name': 'Unit 4', 'topics': ['Security', 'Edge Computing', 'IoT Applications']}
+        ,{'name': 'IOT workshop', 'topics': ['Hands-on Projects', 'Device Setup', 'Practical Implementations']}
       ]
     },
     {

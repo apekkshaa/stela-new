@@ -125,6 +125,7 @@ final List<Map<String, dynamic>> facultySubjects = [
       {"name": "Unit 2"},
       {"name": "Unit 3"},
       {"name": "Unit 4"},
+      {"name": "IOT workshop"},
     ],
   },
   {
