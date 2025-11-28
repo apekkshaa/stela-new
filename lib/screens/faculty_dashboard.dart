@@ -12,6 +12,7 @@ import 'package:stela_app/screens/faculty_submissions_manage.dart';
 import 'package:stela_app/screens/faculty_announcements_manage.dart';
 import 'package:stela_app/screens/faculty_progress_manage.dart';
 import 'package:stela_app/screens/faculty_feedback_manage.dart';
+import 'package:stela_app/screens/faculty_lab_practicals_manage.dart';
 import 'package:stela_app/screens/subjects.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,6 +77,12 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
       "icon": Icons.quiz,
       "route": FacultyQuizPortal(),
       "desc": "Add quizzes for students"
+    },
+    {
+      "title": "Lab Practicals",
+      "icon": Icons.science,
+      "route": FacultyLabPracticalsManage(),
+      "desc": "Create and manage lab practicals"
     },
     {
       "title": "View Submissions",

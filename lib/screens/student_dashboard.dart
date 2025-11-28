@@ -11,6 +11,7 @@ import 'package:stela_app/screens/quizzes.dart';
 import 'package:stela_app/screens/timetable.dart';
 import 'package:stela_app/screens/announcements_page.dart';
 import 'package:stela_app/screens/feedback_page.dart';
+import 'package:stela_app/screens/lab_practical_page.dart';
 
 class StudentDashboard extends StatefulWidget {
   @override
@@ -62,9 +63,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
       "desc": "Share your thoughts"
     },
     {
-      "title": "Skill Lab",
+      "title": "Lab Practical",
       "icon": Icons.computer,
-      "route": Placeholder(),
+      "route": LabPracticalPage(),
       "desc": "Practice coding"
     },
     // Removed: Study Material, Live Labs, Resources, Help
