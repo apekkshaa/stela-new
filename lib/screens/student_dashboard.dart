@@ -42,18 +42,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
       "desc": "See your class schedule"
     },
     {
-      "title": "Study Material",
-      "icon": Icons.description,
-      "route": Placeholder(),
-      "desc": "Access notes & docs"
-    },
-    {
-      "title": "Live Labs",
-      "icon": Icons.science,
-      "route": Placeholder(),
-      "desc": "Hands-on coding labs"
-    },
-    {
       "title": "Quizzes",
       "icon": Icons.quiz,
       "route": QuizzesScreen(),
@@ -77,18 +65,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       "route": Placeholder(),
       "desc": "Practice coding"
     },
-    {
-      "title": "Resources",
-      "icon": Icons.menu_book,
-      "route": Placeholder(),
-      "desc": "Extra learning aids"
-    },
-    {
-      "title": "Help",
-      "icon": Icons.help_outline,
-      "route": Placeholder(),
-      "desc": "Get support"
-    },
+    // Removed: Study Material, Live Labs, Resources, Help
   ];
 
   // Navigation methods
