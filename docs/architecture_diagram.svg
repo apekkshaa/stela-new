@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333" />
+    </marker>
+    <style>
+      .box { fill:#ffffff; stroke:#2b2b2b; stroke-width:2; rx:8; }
+      .cloud { fill:#f0fbff; stroke:#0376b7; stroke-width:2; rx:12 }
+      .title { font: bold 16px sans-serif; fill:#111 }
+      .small { font: 12px sans-serif; fill:#222 }
+      .muted { font: 11px sans-serif; fill:#666 }
+      .link { stroke:#444; stroke-width:2; fill:none; marker-end:url(#arrow) }
+    </style>
+  </defs>
+
+  <!-- Client -->
+  <rect x="40" y="60" width="260" height="160" class="box" />
+  <text x="170" y="80" class="title" text-anchor="middle">Client (Flutter App)</text>
+  <text x="170" y="105" class="small" text-anchor="middle">Platforms: iOS / Android / Web / Desktop</text>
+  <text x="170" y="130" class="muted" text-anchor="middle">Auth: FirebaseAuth (UID)</text>
+  <text x="170" y="150" class="muted" text-anchor="middle">UI: quizzes, quiz-taking, faculty reviews</text>
+
+  <!-- Firebase Cloud -->
+  <rect x="380" y="30" width="480" height="240" class="cloud" />
+  <text x="620" y="58" class="title" text-anchor="middle">Firebase</text>
+
+  <rect x="420" y="85" width="220" height="40" rx="6" fill="#e9f7ff" stroke="#b3e0ff" />
+  <text x="530" y="110" class="small" text-anchor="middle">Realtime Database (RTDB)</text>
+  <text x="530" y="126" class="muted" text-anchor="middle">Node: /quizzes (subject → unit → quiz)</text>
+
+  <rect x="660" y="85" width="220" height="40" rx="6" fill="#fff6e6" stroke="#ffdd9b" />
+  <text x="770" y="110" class="small" text-anchor="middle">Cloud Firestore</text>
+  <text x="770" y="126" class="muted" text-anchor="middle">Collection: quiz_submissions, students</text>
+
+  <rect x="420" y="145" width="220" height="40" rx="6" fill="#f6fff5" stroke="#bff0c4" />
+  <text x="530" y="170" class="small" text-anchor="middle">Firebase Auth</text>
+  <text x="530" y="186" class="muted" text-anchor="middle">Identifies users (UID used for seeding shuffle)</text>
+
+  <rect x="660" y="145" width="220" height="40" rx="6" fill="#fff5ff" stroke="#e6c2ff" />
+  <text x="770" y="170" class="small" text-anchor="middle">Firebase Storage</text>
+  <text x="770" y="186" class="muted" text-anchor="middle">(Assets, optional uploads)</text>
+
+  <!-- Backend / Admin scripts -->
+  <rect x="120" y="260" width="260" height="120" class="box" />
+  <text x="250" y="285" class="title" text-anchor="middle">Backend Utilities</text>
+  <text x="250" y="310" class="small" text-anchor="middle">Python scripts (Admin)</text>
+  <text x="250" y="330" class="muted" text-anchor="middle">e.g. fix_quiz_submissions.py (Firestore maintenance)</text>
+
+  <!-- Faculty / Export UI -->
+  <rect x="120" y="420" width="260" height="120" class="box" />
+  <text x="250" y="445" class="title" text-anchor="middle">Faculty UI (in App)</text>
+  <text x="250" y="470" class="small" text-anchor="middle">Streams submissions, exports XLSX</text>
+  <text x="250" y="490" class="muted" text-anchor="middle">Uses Firestore queries and download_helper</text>
+
+  <!-- Arrows / Flows -->
+  <!-- Client -> RTDB (read quizzes) -->
+  <path d="M 300 120 L 420 120" class="link" />
+  <text x="360" y="112" class="muted">fetch quizzes (QuizService)</text>
+
+  <!-- Client -> Auth -->
+  <path d="M 300 140 L 420 165" class="link" />
+  <text x="340" y="156" class="muted">authenticate / UID</text>
+
+  <!-- Client -> Firestore (write submissions) -->
+  <path d="M 300 200 L 660 200" class="link" />
+  <text x="480" y="190" class="muted">write: quiz_submissions (student/faculty)</text>
+
+  <!-- Backend scripts -> Firestore -->
+  <path d="M 250 320 L 420 250 L 660 170" class="link" />
+  <text x="380" y="260" class="muted">maintenance & fixes</text>
+
+  <!-- Faculty UI -> Firestore (read/stream) -->
+  <path d="M 250 420 L 660 210" class="link" />
+  <text x="420" y="360" class="muted">stream submissions (snapshots)</text>
+
+  <!-- Notes box -->
+  <rect x="380" y="300" width="480" height="360" fill="none" stroke="#cfcfcf" stroke-dasharray="6 4" rx="8" />
+  <text x="620" y="320" class="muted" text-anchor="middle">Data Split</text>
+  <text x="620" y="340" class="muted" text-anchor="middle">- RTDB: canonical quiz content</text>
+  <text x="620" y="358" class="muted" text-anchor="middle">- Firestore: submissions, students, analytics</text>
+
+  <!-- Footer legend -->
+  <text x="30" y="680" class="muted">Diagram: Flutter client ↔ Firebase (RTDB, Firestore, Auth, Storage) + local admin scripts. Arrows show main data flows for quizzes and submissions.</text>
+</svg>
