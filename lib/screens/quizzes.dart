@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/subject_detail.dart';
 import 'package:stela_app/services/quiz_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Clean, single-file quizzes implementation.
 /// Exposes `QuizzesScreen` as the main entry point for the Quizzes route.
@@ -741,6 +742,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
           total: _mcqs.length,
           quizTitle: widget.quiz['title'] ?? 'Quiz',
           quizColor: widget.quiz['color'] ?? primaryButton,
+          quiz: widget.quiz,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
@@ -1061,12 +1063,14 @@ class QuizResultScreen extends StatefulWidget {
   final int total;
   final String quizTitle;
   final Color quizColor;
+  final Map<String, dynamic>? quiz;
 
   QuizResultScreen({
     required this.score,
     required this.total,
     required this.quizTitle,
     this.quizColor = Colors.blue,
+    this.quiz,
   });
 
   @override
@@ -1108,6 +1112,63 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
     Future.delayed(Duration(milliseconds: 500), () {
       _scoreController.forward();
     });
+    // Persist student submission so progress page can read it
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _saveSubmissionIfNeeded();
+    });
+  }
+
+  Future<void> _saveSubmissionIfNeeded() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final quizMap = widget.quiz;
+      final quizId = quizMap != null ? (quizMap['id'] ?? quizMap['key'] ?? '') : '';
+      final percentage = (widget.score / (widget.total > 0 ? widget.total : 1)) * 100.0;
+
+      // Avoid duplicate submissions: check existing doc for same student and quiz
+      if (quizId.isNotEmpty) {
+        final existing = await FirebaseFirestore.instance
+            .collection('quiz_submissions')
+            .where('quizId', isEqualTo: quizId)
+            .where('studentId', isEqualTo: user.uid)
+            .limit(1)
+            .get();
+        if (existing.docs.isNotEmpty) {
+          // already saved
+          return;
+        }
+      }
+
+      String studentName = '';
+      try {
+        final doc = await FirebaseFirestore.instance.collection('students').doc(user.uid).get();
+        if (doc.exists) studentName = (doc.data()?['name'] ?? '').toString();
+      } catch (e) {
+        print('Error reading student name: $e');
+      }
+
+      final submission = {
+        'quizId': quizId,
+        'quizTitle': widget.quizTitle,
+        'subjectLabel': quizMap != null ? (quizMap['subjectLabel'] ?? quizMap['subject'] ?? quizMap['unit'] ?? '') : '',
+        'subjectId': quizMap != null ? (quizMap['id'] ?? '') : '',
+        'studentId': user.uid,
+        'studentName': studentName,
+        'answers': [],
+        'correctAnswers': widget.score,
+        'percentage': percentage,
+        'timeTakenSeconds': 0,
+        'timestamp': FieldValue.serverTimestamp(),
+        'quizData': quizMap ?? {},
+      };
+
+      await FirebaseFirestore.instance.collection('quiz_submissions').add(submission);
+      print('Saved student submission for quizId=$quizId student=${user.uid}');
+    } catch (e) {
+      print('Error saving student submission: $e');
+    }
   }
 
   @override
