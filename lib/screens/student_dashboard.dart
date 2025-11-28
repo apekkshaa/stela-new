@@ -9,6 +9,7 @@ import 'package:stela_app/screens/SubmitAssignmentPage.dart';
 import 'package:stela_app/screens/ViewProgressPage.dart';
 import 'package:stela_app/screens/quizzes.dart';
 import 'package:stela_app/screens/timetable.dart';
+import 'package:stela_app/screens/announcements_page.dart';
 
 class StudentDashboard extends StatefulWidget {
   @override
@@ -50,7 +51,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     {
       "title": "Announcements",
       "icon": Icons.announcement,
-      "route": Placeholder(),
+      "route": AnnouncementsPage(),
       "desc": "Latest updates"
     },
     {

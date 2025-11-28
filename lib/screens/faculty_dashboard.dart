@@ -98,20 +98,7 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
     {
       "title": "Announcements",
       "icon": Icons.announcement,
-      "route": Builder(
-        builder: (context) => FacultySubjectPicker(
-          subjects: facultySubjects,
-          onSubjectTap: (subject) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => FacultyAnnouncementsManage(subject: subject),
-              ),
-            );
-          },
-          title: "Select Subject to Manage Announcements",
-        ),
-      ),
+      "route": FacultyAnnouncementsManage(),
       "desc": "Post updates for students"
     },
     {
