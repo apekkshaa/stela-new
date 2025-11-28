@@ -11,6 +11,7 @@ import 'package:stela_app/screens/faculty_assignment_manage.dart';
 import 'package:stela_app/screens/faculty_submissions_manage.dart';
 import 'package:stela_app/screens/faculty_announcements_manage.dart';
 import 'package:stela_app/screens/faculty_progress_manage.dart';
+import 'package:stela_app/screens/faculty_feedback_manage.dart';
 import 'package:stela_app/screens/subjects.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -119,6 +120,12 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
         ),
       ),
       "desc": "Track student progress"
+    },
+    {
+      "title": "Feedback",
+      "icon": Icons.feedback,
+      "route": FacultyFeedbackManage(),
+      "desc": "View student feedback and queries"
     },
   ];
 

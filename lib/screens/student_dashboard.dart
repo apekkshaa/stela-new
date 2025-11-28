@@ -10,6 +10,7 @@ import 'package:stela_app/screens/ViewProgressPage.dart';
 import 'package:stela_app/screens/quizzes.dart';
 import 'package:stela_app/screens/timetable.dart';
 import 'package:stela_app/screens/announcements_page.dart';
+import 'package:stela_app/screens/feedback_page.dart';
 
 class StudentDashboard extends StatefulWidget {
   @override
@@ -57,7 +58,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     {
       "title": "Feedback",
       "icon": Icons.feedback,
-      "route": Placeholder(),
+      "route": FeedbackPage(),
       "desc": "Share your thoughts"
     },
     {
