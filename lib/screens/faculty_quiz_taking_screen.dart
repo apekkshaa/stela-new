@@ -5,8 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:async';
 import 'dart:math';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'quiz_results_screen.dart';
+import '../models/quiz_model.dart';
+import '../widgets/code_editor_widget.dart';
+import '../services/quiz_service.dart';
 
 class FacultyQuizTakingScreen extends StatefulWidget {
   final Map<String, dynamic> quiz;
@@ -24,7 +26,12 @@ class FacultyQuizTakingScreen extends StatefulWidget {
 
 class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
   int currentQuestionIndex = 0;
-  Map<int, int> selectedAnswers = {};
+  Map<int, int> selectedAnswers = {}; // For MCQ questions
+  Map<int, String> codingAnswers = {}; // For coding questions
+  Map<int, ProgrammingLanguage> codingLanguages = {}; // Student-selected coding language
+  Map<int, String> subjectiveAnswers = {}; // For subjective questions
+  final TextEditingController _subjectiveController = TextEditingController();
+  int? _subjectiveControllerIndex;
   List<Map<String, dynamic>> questions = [];
   Timer? _timer;
   int timeRemaining = 0; // in seconds
@@ -44,6 +51,15 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
 
     // Shuffle questions and options so each user sees a random order
     _shuffleQuestionsAndOptions();
+
+    // Initialize coding defaults
+    for (int i = 0; i < questions.length; i++) {
+      final q = questions[i];
+      if ((q['type'] ?? '').toString() == 'coding') {
+        final lang = _getProgrammingLanguage(q['language']?.toString());
+        codingLanguages[i] = lang;
+      }
+    }
     
     // Parse duration and set timer
     String duration = widget.quiz['duration'] ?? '15 min';
@@ -73,9 +89,17 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       baseSeed = DateTime.now().millisecondsSinceEpoch;
     }
 
-    // Shuffle options for each question while keeping track of the correct index
+    // Shuffle options for MCQ questions while keeping track of the correct index
     for (int i = 0; i < questions.length; i++) {
       final q = Map<String, dynamic>.from(questions[i]);
+      final type = (q['type'] ?? '').toString();
+
+      // Only MCQs have options/correct indexes to shuffle.
+      if (type == 'coding' || type == 'subjective') {
+        questions[i] = q;
+        continue;
+      }
+
       final List<String> opts = List<String>.from(q['options'] ?? []);
       final int correctIndex = q['correct'] ?? 0;
 
@@ -150,6 +174,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _subjectiveController.dispose();
     super.dispose();
   }
 
@@ -164,6 +189,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       setState(() {
         currentQuestionIndex++;
       });
+      _syncSubjectiveControllerIfNeeded();
     } else {
       _completeQuiz();
     }
@@ -174,7 +200,79 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       setState(() {
         currentQuestionIndex--;
       });
+      _syncSubjectiveControllerIfNeeded();
     }
+  }
+
+  void _syncSubjectiveControllerIfNeeded() {
+    final q = questions.isNotEmpty ? questions[currentQuestionIndex] : null;
+    final type = (q?['type'] ?? '').toString();
+    if (type != 'subjective') return;
+
+    if (_subjectiveControllerIndex == currentQuestionIndex) return;
+    _subjectiveControllerIndex = currentQuestionIndex;
+    _subjectiveController.text = subjectiveAnswers[currentQuestionIndex] ?? '';
+    _subjectiveController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _subjectiveController.text.length),
+    );
+  }
+
+  void _showTestResults() async {
+    final q = questions[currentQuestionIndex];
+    if (q['testCases'] == null || (q['testCases'] as List).isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No test cases available for this question')),
+      );
+      return;
+    }
+
+    final code = codingAnswers[currentQuestionIndex] ?? "";
+
+    // Show loading state
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Container(
+          padding: EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Running Tests...', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final studentLanguage = codingLanguages[currentQuestionIndex] ?? _getProgrammingLanguage(q['language']?.toString());
+    final facultyLanguage = _getProgrammingLanguage(q['language']?.toString());
+
+    // Simulated Code Execution
+    final results = await SimulatedCodeRunner.runTests(
+      code: code,
+      testCasesData: q['testCases'] as List,
+      language: studentLanguage,
+      solutionLanguage: facultyLanguage,
+      solutionCode: q['solutionCode']?.toString(),
+    );
+
+    // Dismiss loading and show results
+    if (mounted) Navigator.pop(context);
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => TestResultsDialog(
+        results: results,
+        language: studentLanguage,
+      ),
+    );
   }
 
   void _completeQuiz() {
@@ -186,21 +284,85 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
   }
 
   Future<void> _showResults() async {
-    int correctAnswers = 0;
+    // Show loading while calculating
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(child: CircularProgressIndicator()),
+    );
+
+    double score = 0;
+    double totalMarks = 0;
+    double marksFromCorrect = 0;
+    double marksFromPartial = 0;
+    int codingTestCasesPassed = 0;
+    int codingTestCasesTotal = 0;
+    final codingTestCasesPassedByQuestion = List<int>.filled(questions.length, 0);
+    final codingTestCasesTotalByQuestion = List<int>.filled(questions.length, 0);
     List<int?> userAnswers = [];
     
     // Calculate results and prepare user answers array
     for (int i = 0; i < questions.length; i++) {
-      int? selectedAnswer = selectedAnswers[i];
-      userAnswers.add(selectedAnswer);
-      
-      int correctAnswer = questions[i]['correct'] ?? 0;
-      if (selectedAnswer == correctAnswer) {
-        correctAnswers++;
+      final q = questions[i];
+      final type = (q['type'] ?? '').toString();
+      final maxMarks = _questionMaxMarks(q);
+      totalMarks += maxMarks;
+
+      if (type == 'coding') {
+        userAnswers.add(null); // MCQs only use this list
+        
+        final code = codingAnswers[i] ?? '';
+        final testCases = (q['testCases'] ?? []) as List;
+        final studentLanguage = codingLanguages[i] ?? _getProgrammingLanguage(q['language']?.toString());
+        final facultyLanguage = _getProgrammingLanguage(q['language']?.toString());
+
+        codingTestCasesTotalByQuestion[i] = testCases.length;
+        
+        if (code.trim().isNotEmpty && testCases.isNotEmpty) {
+          final results = await SimulatedCodeRunner.runTests(
+            code: code,
+            testCasesData: testCases,
+            language: studentLanguage,
+            solutionLanguage: facultyLanguage,
+            solutionCode: q['solutionCode']?.toString(),
+            skipDelay: true,
+          );
+          int passed = results.where((r) => r.isPassed).length;
+          codingTestCasesPassedByQuestion[i] = passed;
+          final earned = (passed / testCases.length) * maxMarks;
+          score += earned;
+          codingTestCasesPassed += passed;
+          codingTestCasesTotal += testCases.length;
+
+          if (passed == testCases.length) {
+            marksFromCorrect += maxMarks;
+          } else if (passed > 0) {
+            marksFromPartial += earned;
+          }
+        } else {
+          // No code / no test cases: earns 0
+          codingTestCasesPassedByQuestion[i] = 0;
+          if (testCases.isNotEmpty) codingTestCasesTotal += testCases.length;
+        }
+      } else if (type == 'subjective') {
+        // Subjective questions are captured but not auto-graded here.
+        userAnswers.add(null);
+      } else {
+        int? selectedAnswer = selectedAnswers[i];
+        userAnswers.add(selectedAnswer);
+        
+        int correctAnswer = q['correct'] ?? 0;
+        if (selectedAnswer != null && selectedAnswer == correctAnswer) {
+          score += maxMarks;
+          marksFromCorrect += maxMarks;
+        }
       }
     }
 
-    double percentage = (correctAnswers / questions.length) * 100;
+    // Dismiss loading
+    Navigator.pop(context);
+
+    double percentage = (score / (totalMarks > 0 ? totalMarks : 1)) * 100;
     
     // Calculate time taken
     Duration timeTaken = quizStartTime != null 
@@ -249,31 +411,8 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       String facultyName = widget.quiz['createdByName'] ?? '';
 
       // Compute a subjectKey that matches the Realtime DB structure used by QuizService.
-      String _mapSubjectIdToFacultyKey(String subjectId) {
-        final Map<String, String> mappings = {
-          'aipt': 'Artificial_Intelligence_-_Programming_Tools',
-          'artificial_intelligence_programming_tools': 'Artificial_Intelligence_-_Programming_Tools',
-          'cloud': 'Cloud_Computing',
-          'cloud_computing': 'Cloud_Computing',
-          'compiler': 'Compiler_Design',
-          'compiler_design': 'Compiler_Design',
-          'networks': 'Computer_Networks',
-          'computer_networks': 'Computer_Networks',
-          'coa': 'Computer_Organization_and_Architecture',
-          'computer_organization_and_architecture': 'Computer_Organization_and_Architecture',
-          'ml': 'Machine_Learning',
-          'machine_learning': 'Machine_Learning',
-          'wireless': 'Wireless_Networks',
-          'wireless_networks': 'Wireless_Networks',
-          'iot': 'Internet_of_Things',
-          'internet_of_things': 'Internet_of_Things',
-          'c_programming': 'C_Programming',
-        };
-        return mappings[subjectId] ?? subjectId.replaceAll('_', '_');
-      }
-
-      final rawSubjectId = (widget.subject['id'] ?? widget.subject['label'] ?? '').toString();
-      final subjectKey = _mapSubjectIdToFacultyKey(rawSubjectId);
+      final rawSubjectId = (widget.subject['id'] ?? widget.subject['value'] ?? widget.subject['label'] ?? '').toString().toLowerCase();
+      final subjectKey = QuizService.mapSubjectIdToFacultyKey(rawSubjectId);
 
       if (facultyId.isEmpty || facultyName.isEmpty) {
         try {
@@ -362,6 +501,13 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
         }
       }
 
+      final codingAnswersList = List.generate(questions.length, (i) => codingAnswers[i] ?? '');
+      final codingLanguagesList = List.generate(
+        questions.length,
+        (i) => (codingLanguages[i] ?? ProgrammingLanguage.python).name,
+      );
+      final subjectiveAnswersList = List.generate(questions.length, (i) => subjectiveAnswers[i] ?? '');
+
       final submission = {
         'quizId': widget.quiz['id'] ?? widget.quiz['key'] ?? '',
         'quizTitle': widget.quiz['title'] ?? '',
@@ -374,8 +520,18 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
         'studentId': studentId,
         'studentName': studentName,
         'answers': userAnswers,
-        'correctAnswers': correctAnswers,
+        'codingAnswers': codingAnswersList,
+        'codingLanguages': codingLanguagesList,
+        'subjectiveAnswers': subjectiveAnswersList,
+        'correctAnswers': score,
         'percentage': percentage,
+        'totalMarks': totalMarks,
+        'marksFromCorrect': marksFromCorrect,
+        'marksFromPartial': marksFromPartial,
+        'codingTestCasesPassed': codingTestCasesPassed,
+        'codingTestCasesTotal': codingTestCasesTotal,
+        'codingTestCasesPassedByQuestion': codingTestCasesPassedByQuestion,
+        'codingTestCasesTotalByQuestion': codingTestCasesTotalByQuestion,
         'timeTakenSeconds': timeTaken.inSeconds,
         'timestamp': FieldValue.serverTimestamp(),
         // mark as sent to faculty immediately when student submits
@@ -420,10 +576,14 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
           subject: widget.subject,
           questions: questions,
           userAnswers: userAnswers,
-          correctAnswers: correctAnswers,
+          correctAnswers: score,
           percentage: percentage,
           timeTaken: timeTaken,
           submissionDocId: submissionDocId,
+          codingAnswers: codingAnswers,
+          codingLanguages: codingLanguages,
+          subjectiveAnswers: subjectiveAnswers,
+          totalMarks: totalMarks,
         ),
       ),
     );
@@ -433,6 +593,44 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     int minutes = seconds ~/ 60;
     int remainingSeconds = seconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  ProgrammingLanguage _getProgrammingLanguage(String? langStr) {
+    if (langStr == null) return ProgrammingLanguage.python;
+    try {
+      return ProgrammingLanguage.values.firstWhere(
+        (e) => e.name == langStr,
+        orElse: () => ProgrammingLanguage.python,
+      );
+    } catch (e) {
+      return ProgrammingLanguage.python;
+    }
+  }
+
+  String _languageLabel(ProgrammingLanguage lang) {
+    switch (lang) {
+      case ProgrammingLanguage.python:
+        return 'Python';
+      case ProgrammingLanguage.java:
+        return 'Java';
+      case ProgrammingLanguage.cpp:
+        return 'C++';
+      case ProgrammingLanguage.javascript:
+        return 'JavaScript';
+      case ProgrammingLanguage.dart:
+        return 'Dart';
+    }
+  }
+
+  double _questionMaxMarks(Map<String, dynamic> question) {
+    final type = (question['type'] ?? '').toString();
+    if (type == 'coding' || type == 'subjective' || type == 'mcq' || type.isEmpty) {
+      final v = question['marks'];
+      if (v is int) return v.toDouble();
+      if (v is double) return v;
+      if (v is String) return double.tryParse(v) ?? 1.0;
+    }
+    return 1.0;
   }
 
   @override
@@ -472,7 +670,12 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     }
 
     Map<String, dynamic> currentQuestion = questions[currentQuestionIndex];
+    String questionType = (currentQuestion['type'] ?? 'mcq').toString();
     List<String> options = List<String>.from(currentQuestion['options'] ?? []);
+
+    if (questionType == 'subjective') {
+      _syncSubjectiveControllerIfNeeded();
+    }
 
     return Scaffold(
       backgroundColor: primaryWhite,
@@ -540,102 +743,280 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
 
           // Question content
           Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Question
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      currentQuestion['question'] ?? '',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: primaryBar,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: 20),
-
-                  // Options
-                  ...options.asMap().entries.map((entry) {
-                    int index = entry.key;
-                    String option = entry.value;
-                    bool isSelected = selectedAnswers[currentQuestionIndex] == index;
-
-                    return Container(
-                      margin: EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        onTap: () => _selectAnswer(index),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Question type badge
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: isSelected 
-                              ? widget.subject['color'].withOpacity(0.1)
-                              : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected 
-                                ? widget.subject['color']
-                                : Colors.grey[300]!,
-                              width: isSelected ? 2 : 1,
-                            ),
+                            color: questionType == 'coding'
+                                ? Colors.purple.shade100
+                                : questionType == 'subjective'
+                                    ? Colors.teal.shade100
+                                    : Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isSelected 
-                                    ? widget.subject['color']
-                                    : Colors.transparent,
-                                  border: Border.all(
-                                    color: isSelected 
-                                      ? widget.subject['color']
-                                      : Colors.grey[400]!,
-                                  ),
-                                ),
-                                child: isSelected 
-                                  ? Icon(Icons.check, color: Colors.white, size: 16)
-                                  : null,
+                              Icon(
+                                questionType == 'coding'
+                                    ? Icons.code
+                                    : questionType == 'subjective'
+                                        ? Icons.edit_note
+                                        : Icons.quiz,
+                                size: 16,
+                                color: questionType == 'coding'
+                                    ? Colors.purple.shade700
+                                    : questionType == 'subjective'
+                                        ? Colors.teal.shade700
+                                        : Colors.blue.shade700,
                               ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  option,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: primaryBar,
-                                  ),
+                              SizedBox(width: 6),
+                              Text(
+                                questionType == 'coding'
+                                    ? 'Coding Question'
+                                    : questionType == 'subjective'
+                                        ? 'Subjective'
+                                        : 'Multiple Choice',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: questionType == 'coding'
+                                      ? Colors.purple.shade700
+                                      : questionType == 'subjective'
+                                          ? Colors.teal.shade700
+                                          : Colors.blue.shade700,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                        
+                        SizedBox(height: 16),
+                        
+                        // Question
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            currentQuestion['question'] ?? '',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: primaryBar,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 20),
+
+                        // Render based on question type
+                        if (questionType == 'coding') ...[
+                          // Coding question UI
+                          // Show test cases if available
+                          if (currentQuestion['testCases'] != null && (currentQuestion['testCases'] as List).isNotEmpty)
+                            TestCasesDisplay(
+                              testCases: (currentQuestion['testCases'] as List)
+                                  .map((tc) => TestCase.fromMap(tc as Map<String, dynamic>))
+                                  .toList(),
+                            ),
+                          
+                          SizedBox(height: 16),
+
+                          Row(
+                            children: [
+                              Text(
+                                'Language:',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              DropdownButton<ProgrammingLanguage>(
+                                value: codingLanguages[currentQuestionIndex] ?? _getProgrammingLanguage(currentQuestion['language']?.toString()),
+                                items: ProgrammingLanguage.values
+                                    .map(
+                                      (lang) => DropdownMenuItem<ProgrammingLanguage>(
+                                        value: lang,
+                                        child: Text(_languageLabel(lang)),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (newLang) {
+                                  if (newLang == null) return;
+                                  setState(() {
+                                    codingLanguages[currentQuestionIndex] = newLang;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          
+                          // Code editor
+                          Container(
+                            height: 400,
+                            child: CodeEditorWidget(
+                              language: codingLanguages[currentQuestionIndex] ?? _getProgrammingLanguage(currentQuestion['language']?.toString()),
+                              initialCode: codingAnswers[currentQuestionIndex] ?? '',
+                              onCodeChanged: (code) {
+                                if (codingAnswers[currentQuestionIndex] != code) {
+                                  codingAnswers[currentQuestionIndex] = code;
+                                  // Safely triggers setState even if the framework is currently building
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted) setState(() {});
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ] else if (questionType == 'subjective') ...[
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: TextField(
+                              controller: _subjectiveController,
+                              maxLines: 6,
+                              decoration: InputDecoration(
+                                hintText: 'Type your answer here',
+                                border: InputBorder.none,
+                              ),
+                              onChanged: (value) {
+                                subjectiveAnswers[currentQuestionIndex] = value;
+                              },
+                            ),
+                          ),
+                        ] else ...[
+                          // MCQ Options
+                          ...options.asMap().entries.map((entry) {
+                            int index = entry.key;
+                            String option = entry.value;
+                            bool isSelected = selectedAnswers[currentQuestionIndex] == index;
+
+                            return Container(
+                              margin: EdgeInsets.only(bottom: 12),
+                              child: InkWell(
+                                onTap: () => _selectAnswer(index),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: isSelected 
+                                      ? widget.subject['color'].withOpacity(0.1)
+                                      : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected 
+                                        ? widget.subject['color']
+                                        : Colors.grey[300]!,
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: isSelected 
+                                            ? widget.subject['color']
+                                            : Colors.transparent,
+                                          border: Border.all(
+                                            color: isSelected 
+                                              ? widget.subject['color']
+                                              : Colors.grey[400]!,
+                                          ),
+                                        ),
+                                        child: isSelected 
+                                          ? Icon(Icons.check, color: Colors.white, size: 16)
+                                          : null,
+                                      ),
+                                      SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          option,
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: primaryBar,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                if (questionType == 'coding') ...[
+                  SizedBox(height: 10),
+                  // ACTION BUTTONS: Skip, Run Tests, Submit
+                  Container(
+                    margin: EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton(
+                          onPressed: _showTestResults,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                          child: Text('Run Tests', style: TextStyle(color: Colors.white)),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            // Mark as answered for tracking (empty is allowed and scores 0).
+                            selectedAnswers[currentQuestionIndex] = 1;
+                            _nextQuestion();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                          child: Text('Submit Answer', style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
 
@@ -662,7 +1043,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
-                    onPressed: selectedAnswers[currentQuestionIndex] != null
+                    onPressed: (currentQuestion['type'] == 'coding' || currentQuestion['type'] == 'subjective' || selectedAnswers[currentQuestionIndex] != null)
                       ? (currentQuestionIndex == questions.length - 1 
                           ? _completeQuiz 
                           : _nextQuestion)
@@ -678,7 +1059,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
                     child: Text(
                       currentQuestionIndex == questions.length - 1 
                         ? 'Complete Quiz' 
-                        : 'Next Question',
+                        : (currentQuestion['type'] == 'coding' ? 'Skip & Next' : 'Next Question'),
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),

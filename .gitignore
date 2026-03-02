@@ -82,6 +82,22 @@ __MACOSX/
 # Web build artifacts
 **/web/build/
 
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+
+# Local tooling / caches
+.firebase/
+
+# Python virtual environments
+.venv/
+venv/
+
+# Logs
+*.log
+flutter_*.log
+
 # Generated files
 **/generated_plugin_registrant.*
 # Track Firebase app id file for iOS/macOS auto-config

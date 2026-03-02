@@ -41,30 +41,10 @@
   <title>stela_app</title>
   <link rel="manifest" href="manifest.json">
 
-  <script>
-    // The value below is injected by flutter build, do not touch.
-    var serviceWorkerVersion = null;
-  </script>
-  <!-- This script adds the flutter initialization JS code -->
-  <script src="flutter.js" defer></script>
+  <script src="flutter_bootstrap.js" async></script>
 </head>
 
 <body>
-  <script>
-    window.addEventListener('load', function (ev) {
-      // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: {
-          serviceWorkerVersion: serviceWorkerVersion,
-        }
-      }).then(function (engineInitializer) {
-        return engineInitializer.initializeEngine();
-      }).then(function (appRunner) {
-        return appRunner.runApp();
-      });
-    });
-  </script>
-
   <!-- Vercel Web Analytics (minimal integration for non-Next.js / SPA sites) -->
   <!--
     This snippet sends a page-view to Vercel's built-in analytics endpoint

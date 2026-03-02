@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/subjects.dart';
 import 'package:stela_app/screens/signup.dart';
+import 'package:stela_app/screens/login.dart';
 import 'package:stela_app/screens/home.dart';
 import 'package:stela_app/screens/faculty_dashboard.dart';
 
@@ -148,6 +149,44 @@ class _FacultySignUpState extends State<FacultySignUp> {
                               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SignUp())),
                               child: Text('Sign up as Student', style: TextStyle(color: primaryButton)),
                             )
+                          ],
+                        ),
+                        
+                        SizedBox(height: 16),
+                        // Login link
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Already have an account? ',
+                              style: TextStyle(
+                                color: primaryBar.withOpacity(0.7),
+                                fontSize: 14,
+                                fontFamily: 'PTSerif',
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => Login()),
+                                );
+                              },
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'Log In',
+                                style: TextStyle(
+                                  color: primaryButton,
+                                  fontSize: 14,
+                                  fontFamily: 'PTSerif',
+                                  fontWeight: FontWeight.w700,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ],

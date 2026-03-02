@@ -8,6 +8,7 @@ import 'package:stela_app/constants/userDetails.dart';
 import 'package:stela_app/screens/student_dashboard.dart';
 import 'package:stela_app/screens/faculty_dashboard.dart';
 import 'package:stela_app/screens/admin_dashboard.dart';
+import 'package:stela_app/screens/signup.dart';
 
 class Login extends StatefulWidget {
   @override
@@ -20,7 +21,39 @@ class _LoginState extends State<Login> {
 
   bool isLoading = false;
   bool _obscurePassword = true;
+  bool _keepLoggedIn = false;
   String email = "", password = "", role = "";
+  late TextEditingController _emailController;
+  late TextEditingController _passwordController;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController();
+    _passwordController = TextEditingController();
+    _loadSavedEmail();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSavedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keepLoggedIn = prefs.getBool('keepLoggedIn') ?? false;
+    final savedEmail = prefs.getString('lastEmail') ?? '';
+
+    if (keepLoggedIn && savedEmail.isNotEmpty) {
+      setState(() {
+        _emailController.text = savedEmail;
+        email = savedEmail;
+        _keepLoggedIn = true;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +145,7 @@ class _LoginState extends State<Login> {
 
                       // Email Field
                       TextFormField(
+                        controller: _emailController,
                         textAlign: TextAlign.left,
                         keyboardType: TextInputType.emailAddress,
                         onChanged: (value) => email = value,
@@ -166,6 +200,7 @@ class _LoginState extends State<Login> {
 
                       // Password Field with Eye Icon
                       TextFormField(
+                        controller: _passwordController,
                         textAlign: TextAlign.left,
                         obscureText: _obscurePassword,
                         onChanged: (value) => password = value,
@@ -248,6 +283,36 @@ class _LoginState extends State<Login> {
                           ),
                         ),
                       ),
+                      SizedBox(height: 16),
+
+                      // Keep Logged In Checkbox
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _keepLoggedIn,
+                            onChanged: (value) {
+                              setState(() {
+                                _keepLoggedIn = value ?? false;
+                              });
+                            },
+                            activeColor: primaryButton,
+                            side: BorderSide(
+                              color: primaryBar.withOpacity(0.5),
+                              width: 2,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Keep me logged in',
+                              style: TextStyle(
+                                color: primaryBar.withOpacity(0.7),
+                                fontSize: 14,
+                                fontFamily: 'PTSerif',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       SizedBox(height: 32),
 
                       // Login Button
@@ -290,6 +355,45 @@ class _LoginState extends State<Login> {
                                 ),
                               ),
                             ),
+                      SizedBox(height: 24),
+
+                      // Sign Up Link
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an account? ",
+                            style: TextStyle(
+                              color: primaryBar.withOpacity(0.7),
+                              fontSize: 14,
+                              fontFamily: 'PTSerif',
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => SignUp()),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Sign Up',
+                              style: TextStyle(
+                                color: primaryButton,
+                                fontSize: 14,
+                                fontFamily: 'PTSerif',
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -306,7 +410,10 @@ class _LoginState extends State<Login> {
 
     setState(() => isLoading = true);
     try {
-      final user = await _auth.signInWithEmailAndPassword(
+      email = _emailController.text;
+      password = _passwordController.text;
+      
+      await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -349,18 +456,30 @@ class _LoginState extends State<Login> {
 
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('userRole', role);
+      
+      // Save "Keep me logged in" preference
+      if (_keepLoggedIn) {
+        await prefs.setBool('keepLoggedIn', true);
+        await prefs.setString('lastEmail', email);
+      } else {
+        await prefs.setBool('keepLoggedIn', false);
+        await prefs.remove('lastEmail');
+      }
 
       // Navigate based on role
       if (role == 'Student') {
         print("➡️ Navigating to StudentDashboard...");
+        if (!mounted) return;
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => StudentDashboard()));
       } else if (role == 'Faculty') {
         print("➡️ Navigating to FacultyDashboard...");
+        if (!mounted) return;
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => FacultyDashboard()));
       } else if (role == 'Admin') {
         print("➡️ Navigating to AdminDashboard...");
+        if (!mounted) return;
         Navigator.pushReplacement(
             context, MaterialPageRoute(builder: (_) => AdminDashboard()));
       } else {
@@ -369,6 +488,7 @@ class _LoginState extends State<Login> {
       }
     } catch (e) {
       print("❌ Login Exception: $e");
+      if (!mounted) return;
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
