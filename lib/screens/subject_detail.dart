@@ -37,11 +37,18 @@ class _SubjectDetailScreenState extends State<SubjectDetailScreen>
 
   Future<void> _loadFacultyQuizzesForSubject() async {
     try {
-      String subjectId = widget.subject['id'];
-      print('Loading faculty quizzes for subject ID: $subjectId');
+      // Robust lookup for subject ID
+      final dynamic subjectMap = widget.subject;
+      String rawId = 'general';
+      if (subjectMap is Map) {
+        rawId = (subjectMap['id'] ?? subjectMap['title'] ?? subjectMap['label'] ?? 'general').toString();
+      }
+      
+      String subjectId = rawId;
+      print('Loading faculty quizzes for subject identifier: $subjectId');
       
       List<Map<String, dynamic>> facultyQuizzes = await _quizService.getQuizzesForSubject(subjectId);
-      print('Retrieved ${facultyQuizzes.length} faculty quizzes');
+      print('Retrieved ${facultyQuizzes.length} faculty quizzes for $subjectId');
       
       // Create a copy of the subject and merge faculty quizzes
       Map<String, dynamic> updatedSubject = Map<String, dynamic>.from(widget.subject);

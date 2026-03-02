@@ -5,6 +5,7 @@ import 'package:excel/excel.dart';
 import 'package:flutter/services.dart';
 import '../utils/download_helper.dart' as download_helper;
 import 'faculty_quiz_submissions_list.dart';
+import '../services/quiz_service.dart';
 
 class FacultySubmissionsManage extends StatefulWidget {
   final Map<String, dynamic> subject;
@@ -16,6 +17,36 @@ class FacultySubmissionsManage extends StatefulWidget {
 
 class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
   String facultyId = '';
+
+  double _questionMaxMarks(Map<String, dynamic> question) {
+    final type = (question['type'] ?? '').toString();
+    if (type == 'coding') {
+      final v = question['marks'];
+      if (v is int) return v.toDouble();
+      if (v is double) return v;
+      if (v is String) return double.tryParse(v) ?? 1.0;
+    }
+    return 1.0;
+  }
+
+  double _computeTotalMarksFromSubmission(Map<String, dynamic> data) {
+    final stored = data['totalMarks'];
+    if (stored is num && stored.toDouble() > 0) return stored.toDouble();
+    try {
+      final quizData = data['quizData'] as Map<String, dynamic>?;
+      if (quizData != null) {
+        final questions = (quizData['facultyQuestions'] != null)
+            ? List<Map<String, dynamic>>.from(quizData['facultyQuestions'])
+            : (quizData['questions'] != null)
+                ? List<Map<String, dynamic>>.from(quizData['questions'])
+                : <Map<String, dynamic>>[];
+        if (questions.isNotEmpty) {
+          return questions.fold<double>(0, (sum, q) => sum + _questionMaxMarks(q));
+        }
+      }
+    } catch (_) {}
+    return 0.0;
+  }
 
   // Normalize human-readable subject labels into the snake_case id used in submissions
   String _normalizeSubjectIdFromLabel(String label) {
@@ -42,30 +73,10 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
   @override
   Widget build(BuildContext context) {
     final subjectLabel = widget.subject['label'] ?? widget.subject['id'] ?? '';
-    String _mapSubjectIdToFacultyKey(String subjectId) {
-      final Map<String, String> mappings = {
-        'aipt': 'Artificial_Intelligence_-_Programming_Tools',
-        'artificial_intelligence_programming_tools': 'Artificial_Intelligence_-_Programming_Tools',
-        'cloud': 'Cloud_Computing',
-        'cloud_computing': 'Cloud_Computing',
-        'compiler': 'Compiler_Design',
-        'compiler_design': 'Compiler_Design',
-        'networks': 'Computer_Networks',
-        'computer_networks': 'Computer_Networks',
-        'coa': 'Computer_Organization_and_Architecture',
-        'computer_organization_and_architecture': 'Computer_Organization_and_Architecture',
-        'ml': 'Machine_Learning',
-        'machine_learning': 'Machine_Learning',
-        'wireless': 'Wireless_Networks',
-        'wireless_networks': 'Wireless_Networks',
-        'iot': 'Internet_of_Things',
-        'internet_of_things': 'Internet_of_Things',
-        'c_programming': 'C_Programming',
-      };
-      return mappings[subjectId] ?? subjectId.replaceAll('_', '_');
-    }
-  final rawSubjectId = (widget.subject['id'] ?? _normalizeSubjectIdFromLabel(widget.subject['label'] ?? '') ?? widget.subject['label'] ?? '').toString();
-    final subjectKey = _mapSubjectIdToFacultyKey(rawSubjectId);
+    
+    // Use the shared QuizService mapping to resolve the subject ID to the Realtime DB key
+    final rawId = (widget.subject['id'] ?? widget.subject['value'] ?? widget.subject['label'] ?? '').toString().toLowerCase();
+    final subjectKey = QuizService.mapSubjectIdToFacultyKey(rawId);
 
     return Scaffold(
       appBar: AppBar(
@@ -198,8 +209,8 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         'Timestamp',
         'Enrollment Number',
         'Name',
-        'Correct Answers',
-        'Wrong Answers',
+        'Marks Gained',
+        'Total Marks',
         'Time Taken (s)',
         'Subject',
         'Unit',
@@ -234,24 +245,8 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
   final studentId = data['studentId'] ?? '';
   final enrollmentNumber = (studentId != '' ? (enrollmentCache[studentId] ?? '') : '');
         final studentName = data['studentName'] ?? '';
-        final correct = data['correctAnswers'] ?? data['correct'];
-        // try to estimate total questions from quizData or answers
-        int? totalQuestions;
-        try {
-          final quizData = data['quizData'] as Map<String, dynamic>?;
-          if (quizData != null) {
-            if (quizData['facultyQuestions'] != null) {
-              totalQuestions = List.from(quizData['facultyQuestions']).length;
-            } else if (quizData['questions'] != null) {
-              totalQuestions = List.from(quizData['questions']).length;
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
-        final answersList = (data['answers'] is List) ? List.from(data['answers']) : null;
-        totalQuestions ??= answersList?.length;
-        final wrong = (correct != null && totalQuestions != null) ? (totalQuestions - (int.tryParse(correct.toString()) ?? 0)) : '';
+        final marksGained = data['correctAnswers'] ?? data['correct'] ?? 0;
+        final totalMarks = _computeTotalMarksFromSubmission(data);
         final timeTaken = data['timeTakenSeconds']?.toString() ?? data['timeTaken']?.toString() ?? '';
         final subject = data['subjectLabel'] ?? '';
         final unit = data['unit'] ?? '';
@@ -260,8 +255,8 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
           timestamp,
           enrollmentNumber.isNotEmpty ? enrollmentNumber : studentId,
           studentName,
-          correct?.toString() ?? '',
-          wrong,
+          marksGained.toString(),
+          totalMarks,
           timeTaken,
           subject,
           unit,
@@ -379,8 +374,8 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         'Timestamp',
         'Enrollment Number',
         'Name',
-        'Correct Answers',
-        'Wrong Answers',
+        'Marks Gained',
+        'Total Marks',
         'Time Taken (s)',
         'Subject',
         'Unit',
@@ -414,21 +409,8 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         final studentId = data['studentId'] ?? '';
         final studentName = data['studentName'] ?? '';
         final enrollmentNumber = (studentId != '' ? (enrollmentCache[studentId] ?? '') : '');
-        final correct = data['correctAnswers'] ?? data['correct'];
-        int? totalQuestions;
-        try {
-          final quizData = data['quizData'] as Map<String, dynamic>?;
-          if (quizData != null) {
-            if (quizData['facultyQuestions'] != null) {
-              totalQuestions = List.from(quizData['facultyQuestions']).length;
-            } else if (quizData['questions'] != null) {
-              totalQuestions = List.from(quizData['questions']).length;
-            }
-          }
-        } catch (e) {}
-        final answersList = (data['answers'] is List) ? List.from(data['answers']) : null;
-        totalQuestions ??= answersList?.length;
-        final wrong = (correct != null && totalQuestions != null) ? (totalQuestions - (int.tryParse(correct.toString()) ?? 0)) : '';
+        final marksGained = data['correctAnswers'] ?? data['correct'] ?? 0;
+        final totalMarks = _computeTotalMarksFromSubmission(data);
         final timeTaken = data['timeTakenSeconds']?.toString() ?? data['timeTaken']?.toString() ?? '';
         final subject = data['subjectLabel'] ?? '';
         final unit = data['unit'] ?? '';
@@ -437,8 +419,8 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
           timestamp,
           enrollmentNumber.isNotEmpty ? enrollmentNumber : studentId,
           studentName,
-          correct?.toString() ?? '',
-          wrong,
+          marksGained.toString(),
+          totalMarks,
           timeTaken,
           subject,
           unit,

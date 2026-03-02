@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as xl;
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -10,9 +11,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../firebase_options.dart';
+import '../models/quiz_model.dart';
+import '../widgets/coding_question_form.dart';
+import '../services/quiz_service.dart';
 
 class FacultyQuizManage extends StatefulWidget {
-  final Map<String, dynamic> subject;
+  final dynamic subject;
   const FacultyQuizManage({required this.subject});
 
   @override
@@ -20,6 +24,19 @@ class FacultyQuizManage extends StatefulWidget {
 }
 
 class _FacultyQuizManageState extends State<FacultyQuizManage> {
+  // Safe accessor for subject as Map<String, dynamic>
+  Map<String, dynamic> get subject => Map<String, dynamic>.from(widget.subject as Map);
+
+  late DatabaseReference _quizRef;
+  List<Map<String, dynamic>> previousQuizzes = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFirebaseAndLoad();
+  }
+
   Future<void> _deleteQuiz(String key, String? unitName) async {
     try {
       bool deleted = false;
@@ -86,22 +103,35 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       );
     }
   }
-  List<Map<String, dynamic>> previousQuizzes = [];
-  late DatabaseReference _quizRef;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _initFirebaseAndLoad();
-  }
 
   Future<void> _initFirebaseAndLoad() async {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    final subjectKey = widget.subject['label'].toString().replaceAll(' ', '_');
-    _quizRef = FirebaseDatabase.instance.ref().child('quizzes').child(subjectKey);
-    await _migrateOldQuizzes(); // Migrate old quizzes to new structure
-    _loadQuizzes();
+    try {
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      
+      // Get a safe ID from the subject Map (could be id, value or label)
+      final dynamic subjectObj = widget.subject;
+      String rawId = 'general';
+      if (subjectObj is Map) {
+        rawId = (subjectObj['id'] ?? subjectObj['value'] ?? subjectObj['label'] ?? 'general').toString();
+      } else if (subjectObj != null) {
+        rawId = subjectObj.toString();
+      }
+      
+      final String subjectId = rawId.toLowerCase();
+      final String subjectKey = QuizService.mapSubjectIdToFacultyKey(subjectId);
+      
+      print('FacultyQuizManage: Initializing for subject raw ID "$subjectId" with key "$subjectKey"');
+      _quizRef = FirebaseDatabase.instance.ref().child('quizzes').child(subjectKey);
+      await _migrateOldQuizzes(); // Migrate old quizzes to new structure
+      await _loadQuizzes();
+    } catch (e) {
+      print('Firebase Init Error: $e');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
   }
 
   Future<void> _migrateOldQuizzes() async {
@@ -155,51 +185,60 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
   }
 
   Future<void> _loadQuizzes() async {
-    final snapshot = await _quizRef.get();
-    List<Map<String, dynamic>> loaded = [];
-    if (snapshot.exists) {
-      final data = snapshot.value as Map<dynamic, dynamic>;
-      
-      // Handle both old structure (direct quizzes) and new structure (unit-based)
-      data.forEach((key, value) {
-        if (value is Map) {
-          // Check if this is a unit (contains nested quizzes) or a direct quiz
-          bool isUnit = false;
-          value.forEach((subKey, subValue) {
-            if (subValue is Map && subValue.containsKey('title') && subValue.containsKey('questions')) {
-              isUnit = true;
+    try {
+      final snapshot = await _quizRef.get();
+      List<Map<String, dynamic>> loaded = [];
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        
+        // Handle both old structure (direct quizzes) and new structure (unit-based)
+        data.forEach((key, value) {
+          if (value is Map) {
+            // Check if this is a unit (contains nested quizzes) or a direct quiz
+            bool isUnit = false;
+            value.forEach((subKey, subValue) {
+              if (subValue is Map && subValue.containsKey('title') && subValue.containsKey('questions')) {
+                isUnit = true;
+                loaded.add({
+                  'key': subKey,
+                  'title': subValue['title']?.toString() ?? '',
+                  'date': subValue['date']?.toString() ?? '',
+                  'unit': subValue['unit']?.toString() ?? key.toString().replaceAll('_', ' '),
+                  'originalUnit': key.toString().replaceAll('_', ' '), // Track original unit for editing
+                  'questions': subValue['questions'] ?? [],
+                  'duration': subValue['duration']?.toString() ?? '30 min',
+                  'pin': subValue['pin']?.toString() ?? '',
+                });
+              }
+            });
+            
+            // If not a unit, treat as direct quiz (backward compatibility)
+            if (!isUnit && value.containsKey('title')) {
               loaded.add({
-                'key': subKey,
-                'title': subValue['title']?.toString() ?? '',
-                'date': subValue['date']?.toString() ?? '',
-                'unit': subValue['unit']?.toString() ?? key.toString().replaceAll('_', ' '),
-                'originalUnit': key.toString().replaceAll('_', ' '), // Track original unit for editing
-                'questions': subValue['questions'] ?? [],
-                'duration': subValue['duration']?.toString() ?? '30 min',
-                'pin': subValue['pin']?.toString() ?? '',
+                'key': key,
+                'title': value['title']?.toString() ?? '',
+                'date': value['date']?.toString() ?? '',
+                'unit': value['unit']?.toString() ?? 'Unit 1',
+                'questions': value['questions'] ?? [],
+                'duration': value['duration']?.toString() ?? '30 min',
+                'pin': value['pin']?.toString() ?? '',
               });
             }
-          });
-          
-          // If not a unit, treat as direct quiz (backward compatibility)
-          if (!isUnit && value.containsKey('title')) {
-            loaded.add({
-              'key': key,
-              'title': value['title']?.toString() ?? '',
-              'date': value['date']?.toString() ?? '',
-              'unit': value['unit']?.toString() ?? 'Unit 1',
-              'questions': value['questions'] ?? [],
-              'duration': value['duration']?.toString() ?? '30 min',
-              'pin': value['pin']?.toString() ?? '',
-            });
           }
-        }
+        });
+      }
+      setState(() {
+        previousQuizzes = loaded;
       });
+    } catch (e) {
+      print('Error loading quizzes: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
-    setState(() {
-      previousQuizzes = loaded;
-      _loading = false;
-    });
   }
 
   Future<void> _addQuiz(dynamic quizData) async {
@@ -207,16 +246,44 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     final unitName = quizData is Map && quizData['unit'] != null ? quizData['unit'] : 'Unit 1';
     final duration = quizData is Map && quizData['duration'] != null ? '${quizData['duration']} min' : '30 min';
     final pin = quizData is Map && quizData['pin'] != null ? quizData['pin'] : '';
+
+    double computeTotalMarks(List questions) {
+      double sum = 0;
+      for (final q in questions) {
+        if (q is Map) {
+          final type = (q['type'] ?? '').toString();
+          if (type == 'coding' || type == 'subjective') {
+            final v = q['marks'];
+            if (v is int) {
+              sum += v.toDouble();
+            } else if (v is double) {
+              sum += v;
+            } else if (v is String) {
+              sum += double.tryParse(v) ?? 1.0;
+            } else {
+              sum += 1.0;
+            }
+          } else {
+            sum += 1.0;
+          }
+        } else {
+          sum += 1.0;
+        }
+      }
+      return sum;
+    }
+
+    final questionsList = quizData is Map && quizData['questions'] != null ? (quizData['questions'] as List) : <dynamic>[];
     final newQuiz = {
       'title': quizData is String ? quizData : quizData['title'],
       'date': date,
       'unit': unitName,
-      'questions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
-      'facultyQuestions': quizData is Map && quizData['questions'] != null ? quizData['questions'] : [],
+      'questions': questionsList,
+      'facultyQuestions': questionsList,
       'duration': duration,
       'pin': pin,
       'instructions': quizData is Map && quizData['instructions'] != null ? quizData['instructions'] : '',
-      'totalMarks': quizData is Map && quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
+      'totalMarks': questionsList.isNotEmpty ? computeTotalMarks(questionsList) : 0,
       // Track which faculty created this quiz
       'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
       'createdByName': FirebaseAuth.instance.currentUser?.displayName ?? '',
@@ -238,16 +305,44 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
     final duration = quizData['duration'] != null ? '${quizData['duration']} min' : '30 min';
     final pin = quizData['pin'] ?? '';
     
+    double computeTotalMarks(List questions) {
+      double sum = 0;
+      for (final q in questions) {
+        if (q is Map) {
+          final type = (q['type'] ?? '').toString();
+          if (type == 'coding' || type == 'subjective') {
+            final v = q['marks'];
+            if (v is int) {
+              sum += v.toDouble();
+            } else if (v is double) {
+              sum += v;
+            } else if (v is String) {
+              sum += double.tryParse(v) ?? 1.0;
+            } else {
+              sum += 1.0;
+            }
+          } else {
+            sum += 1.0;
+          }
+        } else {
+          sum += 1.0;
+        }
+      }
+      return sum;
+    }
+
+    final questionsList = quizData['questions'] ?? [];
+
     final updatedQuiz = {
       'title': quizData['title'],
       'date': quizData['date'] ?? DateTime.now().toString().substring(0, 10),
       'unit': newUnitName,
-      'questions': quizData['questions'] ?? [],
-      'facultyQuestions': quizData['questions'] ?? [],
+      'questions': questionsList,
+      'facultyQuestions': questionsList,
       'duration': duration,
       'pin': pin,
       'instructions': quizData['instructions'] ?? '',
-      'totalMarks': quizData['questions'] != null ? (quizData['questions'] as List).length * 1 : 0,
+      'totalMarks': (questionsList is List) ? computeTotalMarks(questionsList) : 0,
       // Preserve or set the creator
       'createdBy': quizData['createdBy'] ?? FirebaseAuth.instance.currentUser?.uid ?? '',
       'createdByName': quizData['createdByName'] ?? FirebaseAuth.instance.currentUser?.displayName ?? '',
@@ -304,56 +399,251 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
         final excel = xl.Excel.decodeBytes(bytes);
         print('Excel decoded successfully, tables: ${excel.tables.keys.length}');
         
+        bool parseBool(dynamic v) {
+          if (v == null) return false;
+          final s = v.toString().trim().toLowerCase();
+          return s == 'true' || s == '1' || s == 'yes' || s == 'y';
+        }
+
+        int parseCorrectIndex(String answerValue) {
+          final v = answerValue.trim().toUpperCase();
+          if (v == 'A' || v == '1') return 0;
+          if (v == 'B' || v == '2') return 1;
+          if (v == 'C' || v == '3') return 2;
+          if (v == 'D' || v == '4') return 3;
+          final numAnswer = int.tryParse(v);
+          if (numAnswer != null && numAnswer >= 1 && numAnswer <= 4) return numAnswer - 1;
+          return 0;
+        }
+
+        String? cellString(List<xl.Data?> row, Map<String, int> headers, List<String> names) {
+          String? cellValueToString(dynamic v) {
+            if (v == null) return null;
+            try {
+              final inner = (v as dynamic).value;
+              if (inner != null) return inner.toString();
+            } catch (_) {}
+            return v.toString();
+          }
+
+          for (final name in names) {
+            final idx = headers[name];
+            if (idx != null && idx >= 0 && idx < row.length) {
+              final v = row[idx]?.value;
+              if (v != null) {
+                final s = cellValueToString(v) ?? '';
+                if (s.trim().isNotEmpty) return s;
+              }
+            }
+          }
+          return null;
+        }
+
+        String unescapeCodeText(String s) {
+          // Allows paste-safe Excel content like "\\n" to become real newlines in the app editor.
+          // Do NOT apply this to JSON cells like testCases.
+          return s.replaceAll('\\r\\n', '\n').replaceAll('\\n', '\n').replaceAll('\\t', '\t');
+        }
+
+        int? cellInt(List<xl.Data?> row, Map<String, int> headers, List<String> names) {
+          final s = cellString(row, headers, names);
+          if (s == null) return null;
+          return int.tryParse(s.trim());
+        }
+
+        Map<String, int> buildHeaders(List<xl.Data?> headerRow) {
+          final headers = <String, int>{};
+          for (int i = 0; i < headerRow.length; i++) {
+            final v = headerRow[i]?.value;
+            if (v == null) continue;
+            final key = v.toString().trim().toLowerCase();
+            if (key.isEmpty) continue;
+            headers[key] = i;
+          }
+          return headers;
+        }
+
+        ProgrammingLanguage parseLanguage(String? raw) {
+          final s = (raw ?? '').trim().toLowerCase();
+          switch (s) {
+            case 'java':
+              return ProgrammingLanguage.java;
+            case 'cpp':
+            case 'c++':
+              return ProgrammingLanguage.cpp;
+            case 'javascript':
+            case 'js':
+              return ProgrammingLanguage.javascript;
+            case 'dart':
+              return ProgrammingLanguage.dart;
+            case 'python':
+            default:
+              return ProgrammingLanguage.python;
+          }
+        }
+
         for (var table in excel.tables.keys) {
           var sheet = excel.tables[table]!;
           bool isHeaderRow = true;
           print('Processing sheet: $table with ${sheet.rows.length} rows');
-          
-          for (var row in sheet.rows) {
+
+          Map<String, int> headers = {};
+          bool useHeaderFormat = false;
+
+          for (int r = 0; r < sheet.rows.length; r++) {
+            final row = sheet.rows[r];
             if (isHeaderRow) {
+              headers = buildHeaders(row);
+              useHeaderFormat = headers.containsKey('type') ||
+                  headers.containsKey('question_type') ||
+                  headers.containsKey('questiontype');
               isHeaderRow = false;
               continue;
             }
-            
-            if (row.length >= 6 && row[0]?.value != null) {
-              String question = row[0]?.value?.toString() ?? '';
-              List<String> options = [
-                row[1]?.value?.toString() ?? '',
-                row[2]?.value?.toString() ?? '',
-                row[3]?.value?.toString() ?? '',
-                row[4]?.value?.toString() ?? '',
-              ];
-              
-              // Handle both letter (A, B, C, D) and number (1, 2, 3, 4) formats
-              String answerValue = row[5]?.value?.toString().trim().toUpperCase() ?? '';
-              int correct = 0; // Default to first option
-              
-              if (answerValue == 'A' || answerValue == '1') {
-                correct = 0;
-              } else if (answerValue == 'B' || answerValue == '2') {
-                correct = 1;
-              } else if (answerValue == 'C' || answerValue == '3') {
-                correct = 2;
-              } else if (answerValue == 'D' || answerValue == '4') {
-                correct = 3;
+
+            if (useHeaderFormat) {
+              final typeRaw = cellString(row, headers, ['type', 'question_type', 'questiontype']) ?? '';
+              final type = typeRaw.trim().toLowerCase();
+              final questionText = cellString(row, headers, ['question', 'q']) ?? '';
+
+              if (questionText.trim().isEmpty) continue;
+
+              if (type == 'coding') {
+                final lang = parseLanguage(cellString(row, headers, ['language', 'lang']));
+                final marks = cellInt(row, headers, ['marks']) ?? 1;
+                final solutionCodeRaw = cellString(row, headers, ['solutioncode', 'solution_code']) ?? '';
+                final solutionCode = unescapeCodeText(solutionCodeRaw);
+
+                List<Map<String, dynamic>> testCases = [];
+                final testCasesJson = cellString(row, headers, ['testcases', 'test_cases']);
+                if (testCasesJson != null && testCasesJson.trim().isNotEmpty) {
+                  try {
+                    final decoded = jsonDecode(testCasesJson);
+                    if (decoded is List) {
+                      testCases = decoded
+                          .whereType<Map>()
+                          .map((m) => {
+                                'input': (m['input'] ?? '').toString(),
+                                'expectedOutput': (m['expectedOutput'] ?? m['output'] ?? '').toString(),
+                                'isHidden': m['isHidden'] == true,
+                                'description': (m['description'] ?? '').toString(),
+                              })
+                          .toList();
+                    }
+                  } catch (_) {
+                    // Ignore malformed JSON and fall back to column-based parsing.
+                  }
+                }
+
+                if (testCases.isEmpty) {
+                  // Try single test case columns
+                  final singleInput = cellString(row, headers, ['input']);
+                  final singleOut = cellString(row, headers, ['expectedoutput', 'output', 'expected_output']);
+                  if ((singleInput ?? '').trim().isNotEmpty || (singleOut ?? '').trim().isNotEmpty) {
+                    testCases.add({
+                      'input': (singleInput ?? '').toString(),
+                      'expectedOutput': (singleOut ?? '').toString(),
+                      'isHidden': false,
+                      'description': '',
+                    });
+                  }
+                }
+
+                if (testCases.isEmpty) {
+                  // Try numbered test case columns: input1/expectedOutput1[/description1/hidden1]
+                  for (int i = 1; i <= 20; i++) {
+                    final inKey = 'input$i';
+                    final outKey = 'expectedoutput$i';
+                    final outAltKey = 'output$i';
+                    final descKey = 'description$i';
+                    final hiddenKey = 'hidden$i';
+
+                    final input = cellString(row, headers, [inKey]);
+                    final out = cellString(row, headers, [outKey, outAltKey]);
+                    final desc = cellString(row, headers, [descKey]) ?? '';
+                    final hiddenRaw = cellString(row, headers, [hiddenKey]);
+
+                    if ((input ?? '').trim().isEmpty && (out ?? '').trim().isEmpty && desc.trim().isEmpty && (hiddenRaw ?? '').trim().isEmpty) {
+                      // stop when a whole slot is empty
+                      continue;
+                    }
+
+                    if ((input ?? '').trim().isEmpty && (out ?? '').trim().isEmpty) continue;
+
+                    testCases.add({
+                      'input': (input ?? '').toString(),
+                      'expectedOutput': (out ?? '').toString(),
+                      'isHidden': parseBool(hiddenRaw),
+                      'description': desc,
+                    });
+                  }
+                }
+
+                if (testCases.isEmpty) {
+                  print('Skipping coding question with no test cases: $questionText');
+                  continue;
+                }
+
+                final q = <String, dynamic>{
+                  'type': 'coding',
+                  'question': questionText,
+                  'language': lang.name,
+                  'marks': marks,
+                  'solutionCode': solutionCode,
+                  'testCases': testCases,
+                };
+                questions.add(q);
+              } else if (type == 'subjective') {
+                final marks = cellInt(row, headers, ['marks']) ?? 1;
+                final expectedAnswer = cellString(row, headers, ['expectedanswer', 'expected_answer']) ?? '';
+                questions.add({
+                  'type': 'subjective',
+                  'question': questionText,
+                  'marks': marks,
+                  'expectedAnswer': expectedAnswer,
+                });
               } else {
-                // Try to parse as number and convert to 0-based index
-                int? numAnswer = int.tryParse(answerValue);
-                if (numAnswer != null && numAnswer >= 1 && numAnswer <= 4) {
-                  correct = numAnswer - 1;
+                // Default to MCQ
+                final options = <String>[
+                  cellString(row, headers, ['optiona', 'a', 'opt1', 'option1']) ?? '',
+                  cellString(row, headers, ['optionb', 'b', 'opt2', 'option2']) ?? '',
+                  cellString(row, headers, ['optionc', 'c', 'opt3', 'option3']) ?? '',
+                  cellString(row, headers, ['optiond', 'd', 'opt4', 'option4']) ?? '',
+                ];
+                final answerValue = cellString(row, headers, ['correct', 'answer', 'ans']) ?? 'A';
+                final correct = parseCorrectIndex(answerValue);
+
+                if (options.any((opt) => opt.trim().isNotEmpty)) {
+                  questions.add({
+                    'type': 'mcq',
+                    'question': questionText,
+                    'options': options,
+                    'correct': correct,
+                  });
                 }
               }
-              
-              print('Question: $question');
-              print('Options: $options');
-              print('Answer value: "$answerValue" -> Index: $correct');
-              
-              if (question.isNotEmpty && options.any((opt) => opt.isNotEmpty)) {
-                questions.add({
-                  'question': question,
-                  'options': options,
-                  'correct': correct,
-                });
+            } else {
+              // Legacy MCQ-only: columns [question, A, B, C, D, correct]
+              if (row.length >= 6 && row[0]?.value != null) {
+                String question = row[0]?.value?.toString() ?? '';
+                List<String> options = [
+                  row[1]?.value?.toString() ?? '',
+                  row[2]?.value?.toString() ?? '',
+                  row[3]?.value?.toString() ?? '',
+                  row[4]?.value?.toString() ?? '',
+                ];
+
+                String answerValue = row[5]?.value?.toString() ?? '';
+                int correct = parseCorrectIndex(answerValue);
+
+                if (question.isNotEmpty && options.any((opt) => opt.isNotEmpty)) {
+                  questions.add({
+                    'type': 'mcq',
+                    'question': question,
+                    'options': options,
+                    'correct': correct,
+                  });
+                }
               }
             }
           }
@@ -545,7 +835,9 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                                       if (quiz['questions'] is List) {
                                                         questionsList = (quiz['questions'] as List).map((q) => Map<String, dynamic>.from(q as Map)).toList();
                                                       } else if (quiz['questions'] is Map) {
-                                                        questionsList = [Map<String, dynamic>.from(quiz['questions'] as Map)];
+                                                        final map = (quiz['questions'] as Map);
+                                                        final sortedKeys = map.keys.toList()..sort((a,b) => a.toString().compareTo(b.toString()));
+                                                        questionsList = sortedKeys.map((k) => Map<String, dynamic>.from(map[k])).toList();
                                                       }
                                                     }
                                                     final result = await Navigator.push(
@@ -595,7 +887,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
 }
 
 class QuizCreationForm extends StatefulWidget {
-  final Map<String, dynamic> subject;
+  final dynamic subject;
   final String? initialTitle;
   final List<Map<String, dynamic>>? initialQuestions;
   final int? initialDuration;
@@ -609,6 +901,9 @@ class QuizCreationForm extends StatefulWidget {
 }
 
 class _QuizCreationFormState extends State<QuizCreationForm> {
+  // Safe accessor for subject as Map<String, dynamic>
+  Map<String, dynamic> get subject => Map<String, dynamic>.from(widget.subject as Map);
+
   final _formKey = GlobalKey<FormState>();
   String quizTitle = "";
   String? selectedUnit;
@@ -624,37 +919,115 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
     quizTitle = widget.initialTitle ?? "";
     duration = widget.initialDuration ?? 30;
     pin = widget.initialPin ?? "";
-  instructions = widget.initialInstructions ?? "";
-    
+    instructions = widget.initialInstructions ?? "";
+
     // Initialize available units from subject data
-    if (widget.subject['units'] != null) {
-      availableUnits = (widget.subject['units'] as List<dynamic>)
-          .map((unit) => unit['name'] as String)
-          .toList();
-    } else {
-      // Default units if no units are defined
+    if (subject['units'] != null) {
+      final unitsData = subject['units'];
+      if (unitsData is List) {
+        availableUnits = unitsData
+            .map((unit) => (unit is Map ? unit['name']?.toString() : unit?.toString()) ?? '')
+            .where((name) => name.isNotEmpty)
+            .toList();
+      }
+    }
+    
+    if (availableUnits.isEmpty) {
       availableUnits = ['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4'];
     }
     
-    questions = widget.initialQuestions != null
-        ? widget.initialQuestions!.map((q) => {
-              'question': q['question'] ?? '',
-              'options': List<String>.from(q['options'] ?? List<String>.filled(4, '')),
-              'correct': q['correct'] is int ? q['correct'] : (q['correct'] is String ? int.tryParse(q['correct']) : null),
-            }).toList()
-        : [];
+    if (widget.initialQuestions != null) {
+      questions = widget.initialQuestions!.map((dynamic q) {
+        final Map<String, dynamic> questionMap = Map<String, dynamic>.from(q as Map);
+        final type = (questionMap['type'] ?? '').toString();
+
+        // Image-based questions were removed; strip any old persisted image fields.
+        questionMap.remove('imageUrl');
+
+        // Preserve coding and subjective as-is (they already store richer fields).
+        if (type == 'coding' || type == 'subjective') {
+          return questionMap;
+        } else {
+          return {
+            'type': 'mcq',
+            'question': questionMap['question']?.toString() ?? '',
+            'options': questionMap['options'] is List 
+                ? List<String>.from((questionMap['options'] as List).map((e) => e?.toString() ?? ''))
+                : List<String>.filled(4, ''),
+            'correct': _toInt(questionMap['correct']),
+          };
+        }
+      }).toList();
+    } else {
+      questions = [];
+    }
+    
     // Preselect unit if provided
     selectedUnit = widget.initialUnit ?? selectedUnit;
   }
 
-  void _addQuestion() {
+  int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  void _addMCQQuestion() {
     setState(() {
       questions.add({
+        'type': 'mcq',
         'question': '',
         'options': List<String>.filled(4, ''),
         'correct': null, // No option pre-selected
       });
     });
+  }
+
+  void _addSubjectiveQuestion() {
+    setState(() {
+      questions.add({
+        'type': 'subjective',
+        'question': '',
+        'marks': 1,
+        'expectedAnswer': '',
+      });
+    });
+  }
+
+  void _addCodingQuestion() {
+    showDialog(
+      context: context,
+      builder: (context) => CodingQuestionForm(
+        onSave: (questionData) {
+          setState(() {
+            questions.add(questionData);
+          });
+          Navigator.pop(context);
+        },
+        onCancel: () {
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  void _editCodingQuestion(int index, Map<String, dynamic> question) {
+    showDialog(
+      context: context,
+      builder: (context) => CodingQuestionForm(
+        initialQuestion: question,
+        onSave: (questionData) {
+          setState(() {
+            questions[index] = questionData;
+          });
+          Navigator.pop(context);
+        },
+        onCancel: () {
+          Navigator.pop(context);
+        },
+      ),
+    );
   }
 
   String _generateRandomPin() {
@@ -664,7 +1037,10 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
 
   bool _validateCorrectAnswers() {
     for (var q in questions) {
-      if (q['correct'] == null) return false;
+      // MCQ questions need a correct answer selected
+      if (q['type'] == 'mcq' && q['correct'] == null) return false;
+      // Coding questions need at least one test case
+      if (q['type'] == 'coding' && (q['testCases'] == null || q['testCases'].isEmpty)) return false;
     }
     return true;
   }
@@ -803,7 +1179,33 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                 SizedBox(height: 12),
                 ...questions.asMap().entries.map((entry) {
                   int qIndex = entry.key;
-                  Map<String, dynamic> q = entry.value;
+                  final q = Map<String, dynamic>.from(entry.value as Map);
+                  final String questionType = q['type']?.toString() ?? 'mcq';
+
+                  Color _badgeBg() {
+                    if (questionType == 'coding') return Colors.purple.shade100;
+                    if (questionType == 'subjective') return Colors.orange.shade100;
+                    return Colors.blue.shade100;
+                  }
+
+                  Color _badgeFg() {
+                    if (questionType == 'coding') return Colors.purple.shade700;
+                    if (questionType == 'subjective') return Colors.orange.shade700;
+                    return Colors.blue.shade700;
+                  }
+
+                  IconData _badgeIcon() {
+                    if (questionType == 'coding') return Icons.code;
+                    if (questionType == 'subjective') return Icons.subject;
+                    return Icons.quiz;
+                  }
+
+                  String _badgeText() {
+                    if (questionType == 'coding') return 'Coding Question';
+                    if (questionType == 'subjective') return 'Subjective';
+                    return 'MCQ';
+                  }
+                  
                   return Card(
                     margin: EdgeInsets.symmetric(vertical: 8),
                     child: Padding(
@@ -811,61 +1213,203 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: "Question ${qIndex + 1}",
-                              border: OutlineInputBorder(),
-                            ),
-                            initialValue: q['question'],
-                            validator: (value) => value == null || value.isEmpty ? "Enter question" : null,
-                            onChanged: (value) => questions[qIndex]['question'] = value,
-                          ),
-                          SizedBox(height: 12),
-                          ...List.generate(4, (optIdx) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8.0),
+                          // Question type badge
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _badgeBg(),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Radio<int>(
-                                      value: optIdx,
-                                      groupValue: q['correct'],
-                                      onChanged: (val) {
-                                        setState(() {
-                                          questions[qIndex]['correct'] = val;
-                                        });
-                                      },
+                                    Icon(
+                                      _badgeIcon(),
+                                      size: 14,
+                                      color: _badgeFg(),
                                     ),
-                                    Expanded(
-                                      child: TextFormField(
-                                        decoration: InputDecoration(
-                                          labelText: "Option ${optIdx + 1}",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        initialValue: q['options'][optIdx],
-                                        validator: (value) => value == null || value.isEmpty ? "Enter option" : null,
-                                        onChanged: (value) => questions[qIndex]['options'][optIdx] = value,
+                                    SizedBox(width: 4),
+                                    Text(
+                                      _badgeText(),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: _badgeFg(),
                                       ),
                                     ),
-                                    if (q['correct'] == optIdx)
-                                      Container(
-                                        margin: EdgeInsets.only(left: 8),
-                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.green,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text("Correct", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                      ),
                                   ],
                                 ),
-                              )),
-                          if (q['correct'] == null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                "Please select the correct answer",
-                                style: TextStyle(color: Colors.red, fontSize: 12),
+                              ),
+                              Spacer(),
+                              Text(
+                                "Question ${qIndex + 1}",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          
+                          // Render based on question type
+                          if (questionType == 'mcq') ...[
+                            // MCQ Question rendering
+                            TextFormField(
+                              decoration: InputDecoration(
+                                labelText: "Question",
+                                border: OutlineInputBorder(),
+                              ),
+                              initialValue: q['question'],
+                              validator: (value) => value == null || value.isEmpty ? "Enter question" : null,
+                              onChanged: (value) => questions[qIndex]['question'] = value,
+                            ),
+                            SizedBox(height: 12),
+                            ...List.generate(4, (optIdx) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8.0),
+                                  child: Row(
+                                    children: [
+                                      Radio<int>(
+                                        value: optIdx,
+                                        groupValue: q['correct'],
+                                        onChanged: (val) {
+                                          setState(() {
+                                            questions[qIndex]['correct'] = val;
+                                          });
+                                        },
+                                      ),
+                                      Expanded(
+                                        child: TextFormField(
+                                          decoration: InputDecoration(
+                                            labelText: "Option ${optIdx + 1}",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          initialValue: q['options'][optIdx],
+                                          validator: (value) => value == null || value.isEmpty ? "Enter option" : null,
+                                          onChanged: (value) => questions[qIndex]['options'][optIdx] = value,
+                                        ),
+                                      ),
+                                      if (q['correct'] == optIdx)
+                                        Container(
+                                          margin: EdgeInsets.only(left: 8),
+                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text("Correct", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                        ),
+                                    ],
+                                  ),
+                                )),
+                            if (q['correct'] == null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  "Please select the correct answer",
+                                  style: TextStyle(color: Colors.red, fontSize: 12),
+                                ),
+                              ),
+                          ] else if (questionType == 'subjective') ...[
+                            TextFormField(
+                              decoration: InputDecoration(
+                                labelText: 'Question',
+                                border: OutlineInputBorder(),
+                              ),
+                              initialValue: (q['question'] ?? '').toString(),
+                              validator: (value) => value == null || value.isEmpty ? 'Enter question' : null,
+                              onChanged: (value) => questions[qIndex]['question'] = value,
+                            ),
+                            SizedBox(height: 12),
+                            TextFormField(
+                              decoration: InputDecoration(
+                                labelText: 'Marks',
+                                hintText: 'e.g., 2, 5, 10',
+                                border: OutlineInputBorder(),
+                              ),
+                              keyboardType: TextInputType.number,
+                              initialValue: (q['marks'] ?? 1).toString(),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) return 'Required';
+                                final parsed = int.tryParse(value.trim());
+                                if (parsed == null) return 'Invalid number';
+                                if (parsed <= 0) return 'Marks must be > 0';
+                                return null;
+                              },
+                              onChanged: (value) => questions[qIndex]['marks'] = int.tryParse(value.trim()) ?? (q['marks'] ?? 1),
+                            ),
+                            SizedBox(height: 12),
+                            TextFormField(
+                              decoration: InputDecoration(
+                                labelText: 'Expected Answer (optional)',
+                                border: OutlineInputBorder(),
+                              ),
+                              initialValue: (q['expectedAnswer'] ?? '').toString(),
+                              maxLines: 3,
+                              onChanged: (value) => questions[qIndex]['expectedAnswer'] = value,
+                            ),
+                          ] else ...[
+                            // Coding Question rendering (summary view)
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    q['question'] ?? 'No question text',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.computer, size: 16, color: Colors.grey.shade600),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Language: ${q['language'] ?? 'python'}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                      ),
+                                      SizedBox(width: 16),
+                                      Icon(Icons.emoji_events_outlined, size: 16, color: Colors.grey.shade600),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Marks: ${q['marks'] ?? 1}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                      ),
+                                      SizedBox(width: 16),
+                                      Icon(Icons.check_circle_outline, size: 16, color: Colors.grey.shade600),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Test Cases: ${q['testCases']?.length ?? 0}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 8),
+                                  ElevatedButton.icon(
+                                    icon: Icon(Icons.edit, size: 16),
+                                    label: Text('Edit Coding Question'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.purple.shade300,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: () => _editCodingQuestion(qIndex, q),
+                                  ),
+                                ],
                               ),
                             ),
+                          ],
+                          
+                          // Delete button (common for all types)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
@@ -888,13 +1432,33 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                 Row(
                   children: [
                     ElevatedButton.icon(
-                      icon: Icon(Icons.add),
-                      label: Text("Add Question"),
+                      icon: Icon(Icons.quiz),
+                      label: Text("Add MCQ"),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: subject['color'],
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: _addQuestion,
+                      onPressed: _addMCQQuestion,
+                    ),
+                    SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      icon: Icon(Icons.code),
+                      label: Text("Add Coding Question"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _addCodingQuestion,
+                    ),
+                    SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      icon: Icon(Icons.subject),
+                      label: Text('Add Subjective'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _addSubjectiveQuestion,
                     ),
                   ],
                 ),

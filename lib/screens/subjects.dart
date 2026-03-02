@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:stela_app/constants/colors.dart';
 import 'package:stela_app/screens/profile.dart';
@@ -29,7 +30,27 @@ class Subjects extends StatefulWidget {
 }
 
 class _SubjectsState extends State<Subjects> {
-  final List<Map<String, dynamic>> subjects = [
+  late List<Map<String, dynamic>> allSubjects = [];
+  late List<Map<String, dynamic>> firestoreSubjects = [];
+  String _searchQuery = '';
+  
+  final List<IconData> _availableIcons = [
+    Icons.psychology,
+    Icons.cloud,
+    Icons.build,
+    Icons.network_check,
+    Icons.computer,
+    Icons.memory,
+    Icons.functions,
+    Icons.wifi,
+    Icons.science,
+    Icons.code,
+    Icons.storage,
+    Icons.security,
+    Icons.extension,
+  ];
+
+  final List<Map<String, dynamic>> defaultSubjects = [
     {
       "label": "Artificial Intelligence - Programming Tools",
       "widget": PythonTutorial(),
@@ -142,9 +163,46 @@ class _SubjectsState extends State<Subjects> {
   final List<String> categories = [
     "All",
     "Core Subjects",
+    "Faculty Courses",
     "Practice",
     "Resources"
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    allSubjects = List.from(defaultSubjects);
+    _loadFirestoreSubjects();
+  }
+
+  Future<void> _loadFirestoreSubjects() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('subjects')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      setState(() {
+        firestoreSubjects = snapshot.docs.map((doc) {
+          final data = doc.data();
+          final iconIndex = data['icon'] as int? ?? 0;
+          return {
+            'label': data['label'] ?? 'Unnamed Subject',
+            'description': data['description'] ?? '',
+            'category': 'Faculty Courses',
+            'icon': _availableIcons[
+                iconIndex < _availableIcons.length ? iconIndex : 0],
+            'color': Color(data['color'] as int? ?? 0xFF2196F3),
+            'facultyName': data['facultyName'] ?? 'Faculty',
+          };
+        }).toList();
+        
+        allSubjects = [...defaultSubjects, ...firestoreSubjects];
+      });
+    } catch (e) {
+      print('Error loading Firestore subjects: $e');
+    }
+  }
 
   // Navigation methods
   void _navigateToHome() {
@@ -360,11 +418,21 @@ class _SubjectsState extends State<Subjects> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredSubjects = selectedCategory == "All"
-        ? subjects
-        : subjects
-            .where((subject) => subject['category'] == selectedCategory)
-            .toList();
+    final query = _searchQuery.trim().toLowerCase();
+    final categoryFilteredSubjects = selectedCategory == "All"
+      ? allSubjects
+      : allSubjects
+        .where((subject) => subject['category'] == selectedCategory)
+        .toList();
+
+    final filteredSubjects = query.isEmpty
+      ? categoryFilteredSubjects
+      : categoryFilteredSubjects.where((subject) {
+        final label = (subject['label'] ?? '').toString().toLowerCase();
+        final category = (subject['category'] ?? '').toString().toLowerCase();
+        final description = (subject['description'] ?? '').toString().toLowerCase();
+        return label.contains(query) || category.contains(query) || description.contains(query);
+        }).toList();
 
     return Scaffold(
       backgroundColor: primaryWhite,
@@ -448,6 +516,21 @@ class _SubjectsState extends State<Subjects> {
                   );
                 }).toList(),
               ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search subjects',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: (query) {
+                setState(() => _searchQuery = query);
+              },
             ),
           ),
           Expanded(
@@ -663,6 +746,21 @@ class _SubjectsState extends State<Subjects> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (item.containsKey('facultyName'))
+                      Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                          'by ${item['facultyName']}',
+                          style: TextStyle(
+                            color: primaryButton,
+                            fontSize: 10,
+                            fontFamily: 'PTSerif',
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     Spacer(),
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),

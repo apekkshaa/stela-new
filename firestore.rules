@@ -1,9 +1,50 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow authenticated users to read any document
     match /{document=**} {
-      allow read, write: if
-          request.time < timestamp.date(2022, 8, 20);
+      allow read: if request.auth != null;
+    }
+    
+    // Users collection - anyone can read their own data
+    match /users/{user} {
+      allow read, write: if request.auth.uid == user;
+    }
+    
+    // Subjects - faculty can create/read their own, students can read all
+    match /subjects/{subject} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.facultyUID == request.auth.uid;
+      allow update, delete: if request.auth.uid == resource.data.facultyUID;
+    }
+    
+    // Quizzes - faculty can manage their own
+    match /subjects/{subject}/quizzes/{quiz} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth.uid == get(/databases/$(database)/documents/subjects/$(subject)).data.facultyUID;
+    }
+    
+    // Assignments - faculty can manage their own
+    match /subjects/{subject}/assignments/{assignment} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth.uid == get(/databases/$(database)/documents/subjects/$(subject)).data.facultyUID;
+    }
+
+    // Assignments (top-level) - faculty can create/manage their own
+    match /assignments/{assignment} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.facultyUID == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.facultyUID == request.auth.uid;
+    }
+
+    // Assignment submissions - students submit, faculty can read submissions for their assignments
+    match /assignmentSubmissions/{submission} {
+      allow read: if request.auth != null && (
+        resource.data.studentUID == request.auth.uid ||
+        get(/databases/$(database)/documents/assignments/$(resource.data.assignmentId)).data.facultyUID == request.auth.uid
+      );
+      allow create: if request.auth != null && request.resource.data.studentUID == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }
