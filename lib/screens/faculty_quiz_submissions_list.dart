@@ -24,49 +24,6 @@ class FacultyQuizSubmissionsList extends StatelessWidget {
     return coll.where('subjectKey', isEqualTo: subjectKey).snapshots();
   }
 
-  String _fmtScore(num? v) {
-    final d = (v ?? 0).toDouble();
-    if (d % 1 == 0) return d.toInt().toString();
-    return d.toStringAsFixed(2);
-  }
-
-  double _questionMaxMarks(Map<String, dynamic> question) {
-    final type = (question['type'] ?? '').toString();
-    if (type == 'coding' || type == 'subjective' || type == 'mcq' || type.isEmpty) {
-      final v = question['marks'];
-      if (v is int) return v.toDouble();
-      if (v is double) return v;
-      if (v is String) return double.tryParse(v) ?? 1.0;
-    }
-    return 1.0;
-  }
-
-  int? _asOptionIndex(dynamic value, List<String> options) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) {
-      final idx = options.indexOf(value);
-      if (idx >= 0) return idx;
-      return int.tryParse(value);
-    }
-    return null;
-  }
-
-  bool _isMcqCorrect(Map<String, dynamic> question, dynamic userAnswer) {
-    final options = List<String>.from(question['options'] ?? const <String>[]);
-    final correctRaw = question['correct'];
-    final correctIdx = _asOptionIndex(correctRaw, options);
-    final userIdx = _asOptionIndex(userAnswer, options);
-    if (correctIdx != null && userIdx != null) return correctIdx == userIdx;
-
-    // Fallback for legacy shapes where values might be stored as strings.
-    if (correctRaw != null && userAnswer != null) {
-      return correctRaw.toString() == userAnswer.toString();
-    }
-    return false;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -111,14 +68,13 @@ class FacultyQuizSubmissionsList extends StatelessWidget {
               final d = filtered[index].data();
               final studentName = d['studentName'] ?? 'Unknown';
               final qTitle = d['quizTitle'] ?? d['quizId'] ?? 'Quiz';
-              final earnedMarks = (d['correctAnswers'] ?? d['correct'] ?? 0) as num;
-              final totalMarks = (d['totalMarks'] ?? 0) as num;
+              final correctAnswers = d['correctAnswers'] != null ? d['correctAnswers'].toString() : (d['correct'] != null ? d['correct'].toString() : '');
               final timestamp = (d['timestamp'] as Timestamp?)?.toDate()?.toString().split('.')[0] ?? '';
 
               return Card(
                 child: ListTile(
                   title: Text('$studentName — $qTitle'),
-                  subtitle: Text('Marks: ${_fmtScore(earnedMarks)}${totalMarks > 0 ? ' / ${_fmtScore(totalMarks)}' : ''} • $timestamp'),
+                  subtitle: Text('Correct: ${correctAnswers} • $timestamp'),
                   trailing: IconButton(
                     icon: Icon(Icons.delete, color: Colors.redAccent),
                     tooltip: 'Delete submission',
@@ -158,43 +114,6 @@ class FacultyQuizSubmissionsList extends StatelessWidget {
                               : <Map<String, dynamic>>[];
 
                       final answers = List<dynamic>.from(d['answers'] ?? []);
-                      final codingAnswers = List<dynamic>.from(d['codingAnswers'] ?? []);
-                      final subjectiveAnswers = List<dynamic>.from(d['subjectiveAnswers'] ?? []);
-
-                      final earnedMarks = (d['correctAnswers'] ?? d['correct'] ?? 0) as num;
-                      final storedTotalMarks = (d['totalMarks'] ?? 0) as num;
-                      final computedTotalMarks = questions.fold<double>(0, (sum, q) => sum + _questionMaxMarks(q));
-                      final totalMarks = storedTotalMarks.toDouble() > 0 ? storedTotalMarks.toDouble() : computedTotalMarks;
-
-                      final marksFromCorrect = (d['marksFromCorrect'] ?? d['marksFull'] ?? d['fullMarks'] ?? d['marksCorrect']) as num?;
-                      final marksFromPartial = (d['marksFromPartial'] ?? d['partialMarks'] ?? d['marksPartial']) as num?;
-                      final codingPassedTotal = (d['codingTestCasesPassed'] ?? d['codingPassedTotal'] ?? d['testCasesPassedTotal']) as num?;
-                      final codingTotalTotal = (d['codingTestCasesTotal'] ?? d['codingTotalCases'] ?? d['testCasesTotal']) as num?;
-                      final codingPassedByQuestion = (d['codingTestCasesPassedByQuestion'] as List?)?.map((e) => (e as num?)?.toInt() ?? 0).toList();
-                      final codingTotalByQuestion = (d['codingTestCasesTotalByQuestion'] as List?)?.map((e) => (e as num?)?.toInt() ?? 0).toList();
-
-                      // Fallback breakdown for older submissions that didn't store these fields.
-                      final bool hasBreakdown = marksFromCorrect != null || marksFromPartial != null || (codingPassedTotal != null && codingTotalTotal != null);
-                      double computedMcqFullMarks = 0;
-                      final computedCodingTotalsByQuestion = <int, int>{};
-                      if (!hasBreakdown && questions.isNotEmpty) {
-                        for (int i = 0; i < questions.length; i++) {
-                          final q = questions[i];
-                          final type = (q['type'] ?? '').toString();
-                          if (type == 'coding') {
-                            final tcs = (q['testCases'] ?? []) as List;
-                            computedCodingTotalsByQuestion[i] = tcs.length;
-                            continue;
-                          }
-                          if (type == 'subjective') {
-                            continue;
-                          }
-                          final ua = answers.length > i ? answers[i] : null;
-                          if (_isMcqCorrect(q, ua)) {
-                            computedMcqFullMarks += _questionMaxMarks(q);
-                          }
-                        }
-                      }
 
                       return AlertDialog(
                         title: Text('$studentName — $qTitle'),
@@ -211,67 +130,6 @@ class FacultyQuizSubmissionsList extends StatelessWidget {
                                 // Questions
                                 ...List.generate(questions.length, (index) {
                                   final q = questions[index];
-                                  final type = (q['type'] ?? '').toString();
-                                  final isCoding = type == 'coding';
-                                  final isSubjective = type == 'subjective';
-                                  
-                                  if (isCoding) {
-                                    final code = codingAnswers.length > index ? codingAnswers[index].toString() : '';
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('${index + 1}. [Coding] ${q['question'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          SizedBox(height: 6),
-                                          Container(
-                                            width: double.infinity,
-                                            padding: EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey[900],
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              code.isEmpty ? '// No code submitted' : code,
-                                              style: TextStyle(
-                                                color: Colors.greenAccent,
-                                                fontFamily: 'monospace',
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }
-
-                                  if (isSubjective) {
-                                    final ans = subjectiveAnswers.length > index ? subjectiveAnswers[index].toString() : '';
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('${index + 1}. [Subjective] ${q['question'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          SizedBox(height: 6),
-                                          Container(
-                                            width: double.infinity,
-                                            padding: EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              color: Colors.blueGrey.withOpacity(0.08),
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(color: Colors.blueGrey.withOpacity(0.25)),
-                                            ),
-                                            child: Text(
-                                              ans.trim().isEmpty ? '(No answer submitted)' : ans,
-                                              style: TextStyle(fontSize: 12, color: Colors.black87),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }
-
                                   final userAnswer = answers.length > index ? answers[index] : null;
                                   final correct = q['correct'];
                                   final options = List<String>.from(q['options'] ?? []);
@@ -313,45 +171,14 @@ class FacultyQuizSubmissionsList extends StatelessWidget {
                                 }),
                                 SizedBox(height: 8),
                                 // Footer metadata
-                                Text('Marks: ${_fmtScore(earnedMarks)}${totalMarks > 0 ? ' / ${_fmtScore(totalMarks)}' : ''}'),
-                                if (marksFromCorrect != null)
-                                  Text('Full marks: ${_fmtScore(marksFromCorrect)}')
-                                else if (computedMcqFullMarks > 0)
-                                  Text('Full marks: ${_fmtScore(computedMcqFullMarks)}'),
-                                if (marksFromPartial != null) Text('Partial marks: ${_fmtScore(marksFromPartial)}'),
-                                ...() {
-                                  final lines = <Widget>[];
-                                  bool anyCodingQuestion = false;
-                                  for (int i = 0; i < questions.length; i++) {
-                                    final q = questions[i];
-                                    if ((q['type'] ?? '').toString() != 'coding') continue;
-                                    anyCodingQuestion = true;
-
-                                    final int? passed = (codingPassedByQuestion != null && codingPassedByQuestion.length > i)
-                                        ? codingPassedByQuestion[i]
-                                        : null;
-                                    final int? total = (codingTotalByQuestion != null && codingTotalByQuestion.length > i)
-                                        ? codingTotalByQuestion[i]
-                                        : computedCodingTotalsByQuestion[i];
-
-                                    if (total == null || total == 0) {
-                                      lines.add(Text('Coding Q${i + 1} test cases: 0/0 passed'));
-                                    } else if (passed == null) {
-                                      lines.add(Text('Coding Q${i + 1} test cases: —/$total passed'));
-                                    } else {
-                                      lines.add(Text('Coding Q${i + 1} test cases: $passed/$total passed'));
-                                    }
-                                  }
-
-                                  // For submissions where questions are missing, fall back to aggregate totals if present.
-                                  if (!anyCodingQuestion && codingPassedTotal != null && codingTotalTotal != null) {
-                                    lines.add(Text('Coding test cases: ${codingPassedTotal.toInt()}/${codingTotalTotal.toInt()} passed'));
-                                  }
-                                  return lines;
-                                }(),
+                                // Show correct answers and total questions when possible
+                                Builder(builder: (_) {
+                                  final total = questions.length;
+                                  final correct = d['correctAnswers'] ?? d['correct'] ?? '';
+                                  return Text('Correct answers: ${correct}${total > 0 ? ' / $total' : ''}');
+                                }),
                                 if (d['timeTakenSeconds'] != null) Text('Time taken: ${d['timeTakenSeconds']} seconds'),
-                                if (d['timestamp'] != null)
-                                  Text('Submitted: ${((d['timestamp'] is Timestamp) ? (d['timestamp'] as Timestamp).toDate().toString() : d['timestamp'].toString())}'),
+                                if (d['timestamp'] != null) Text('Submitted: ${((d['timestamp'] as Timestamp?)?.toDate()?.toString() ?? '')}'),
                               ],
                             ),
                           ),

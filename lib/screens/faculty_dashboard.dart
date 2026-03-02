@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:stela_app/constants/colors.dart';
-import 'package:stela_app/screens/faculty_dynamic_subject_picker.dart';
+import 'package:stela_app/screens/faculty_subject_picker.dart';
+import 'package:stela_app/screens/faculty_subjects.dart'; // <-- import the FacultySubjects screen
 import 'package:stela_app/screens/faculty_upload_resource.dart';
+import 'package:stela_app/screens/faculty_subjects_data.dart';
 import 'package:stela_app/screens/faculty_subject_manage.dart';
+import 'package:stela_app/screens/faculty_quiz_manage.dart';
 import 'package:stela_app/screens/faculty_quiz_portal.dart';
 import 'package:stela_app/screens/faculty_assignment_manage.dart';
 import 'package:stela_app/screens/faculty_submissions_manage.dart';
@@ -10,7 +13,6 @@ import 'package:stela_app/screens/faculty_announcements_manage.dart';
 import 'package:stela_app/screens/faculty_progress_manage.dart';
 import 'package:stela_app/screens/faculty_feedback_manage.dart';
 import 'package:stela_app/screens/faculty_lab_practicals_manage.dart';
-import 'package:stela_app/screens/faculty_manage_subjects.dart';
 import 'package:stela_app/screens/subjects.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,12 +29,6 @@ class FacultyDashboard extends StatefulWidget {
 class _FacultyDashboardState extends State<FacultyDashboard> {
   final List<Map<String, dynamic>> features = [
     {
-      "title": "Manage Subjects",
-      "icon": Icons.add_box,
-      "route": FacultyManageSubjects(),
-      "desc": "Create, add, or remove subjects"
-    },
-    {
       "title": "View Subjects",
       "icon": Icons.book_outlined,
       "route": Subjects(),
@@ -42,7 +38,8 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
       "title": "Upload Resource",
       "icon": Icons.upload_file,
       "route": Builder(
-        builder: (context) => FacultyDynamicSubjectPicker(
+        builder: (context) => FacultySubjectPicker(
+          subjects: facultySubjects, // Pass your subjects list here
           onSubjectTap: (subject) {
             Navigator.push(
               context,
@@ -60,7 +57,8 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
       "title": "Create Assignment",
       "icon": Icons.assignment,
       "route": Builder(
-        builder: (context) => FacultyDynamicSubjectPicker(
+        builder: (context) => FacultySubjectPicker(
+          subjects: facultySubjects,
           onSubjectTap: (subject) {
             Navigator.push(
               context,
@@ -77,19 +75,7 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
     {
       "title": "Create Quiz",
       "icon": Icons.quiz,
-      "route": Builder(
-        builder: (context) => FacultyDynamicSubjectPicker(
-          onSubjectTap: (subject) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => FacultyQuizPortal(subject: subject),
-              ),
-            );
-          },
-          title: "Select Subject to Create Quiz",
-        ),
-      ),
+      "route": FacultyQuizPortal(),
       "desc": "Add quizzes for students"
     },
     {
@@ -102,7 +88,8 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
       "title": "View Submissions",
       "icon": Icons.assignment_turned_in,
       "route": Builder(
-        builder: (context) => FacultyDynamicSubjectPicker(
+        builder: (context) => FacultySubjectPicker(
+          subjects: facultySubjects,
           onSubjectTap: (subject) {
             Navigator.push(
               context,
@@ -126,7 +113,8 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
       "title": "Student Progress",
       "icon": Icons.bar_chart,
       "route": Builder(
-        builder: (context) => FacultyDynamicSubjectPicker(
+        builder: (context) => FacultySubjectPicker(
+          subjects: facultySubjects,
           onSubjectTap: (subject) {
             Navigator.push(
               context,

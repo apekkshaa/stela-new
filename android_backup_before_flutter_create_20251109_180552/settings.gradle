@@ -1,0 +1,34 @@
+// Configure plugin and dependency resolution before any other
+// statements per Gradle's requirements.
+pluginManagement {
+	repositories {
+		gradlePluginPortal()
+		google()
+		mavenCentral()
+	}
+}
+
+dependencyResolutionManagement {
+	// Allow project repositories but prefer the settings repositories when
+	// resolving dependencies. This is less strict and avoids failing when
+	// older Gradle scripts add repositories from build.gradle.
+	repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+	repositories {
+		google()
+		mavenCentral()
+	}
+}
+
+rootProject.name = 'stela_app'
+
+include ':app'
+
+// Load local properties (including flutter.sdk)
+def localPropertiesFile = new File(rootProject.projectDir, "local.properties")
+def properties = new Properties()
+if (localPropertiesFile.exists()) {
+	localPropertiesFile.withReader("UTF-8") { reader -> properties.load(reader) }
+}
+
+def flutterSdkPath = properties.getProperty("flutter.sdk")
+assert flutterSdkPath != null, "flutter.sdk not set in local.properties"

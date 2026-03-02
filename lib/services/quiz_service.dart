@@ -12,12 +12,9 @@ class QuizService {
 
   Future<void> initialize() async {
     if (!_initialized) {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-      }
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       _quizzesRef = FirebaseDatabase.instance.ref().child('quizzes');
       _initialized = true;
-      print('QuizService: Initialized successfully');
     }
   }
 
@@ -26,90 +23,102 @@ class QuizService {
     await initialize();
     
     // Map student subject IDs to faculty subject labels
-    final String subjectKey = mapSubjectIdToFacultyKey(subjectId);
-    print('QuizService: Fetching quizzes for "$subjectId" using key "$subjectKey"');
+    final String subjectKey = _mapSubjectIdToFacultyKey(subjectId);
+    print('QuizService: Mapping subject ID "$subjectId" to Firebase key "$subjectKey"');
     
     try {
       final snapshot = await _quizzesRef.child(subjectKey).get();
       List<Map<String, dynamic>> quizzes = [];
       
+      print('QuizService: Firebase snapshot exists: ${snapshot.exists}');
+      
       if (snapshot.exists) {
-        final dynamic snapshotValue = snapshot.value;
-        if (snapshotValue is Map) {
-          snapshotValue.forEach((unitKey, unitValue) {
-            if (unitValue is Map) {
-              // Format 1: Direct quiz under subject
-              if (unitValue.containsKey('title') && unitValue.containsKey('questions')) {
-                quizzes.add(_formatQuizFromData(unitKey, unitValue, 'Unit 1'));
-              } else {
-                // Format 2: Nested under units
-                unitValue.forEach((quizKey, quizValue) {
-                  if (quizValue is Map && quizValue.containsKey('title')) {
-                    quizzes.add(_formatQuizFromData(quizKey, quizValue, unitKey.toString()));
-                  }
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        print('QuizService: Firebase data keys: ${data.keys.toList()}');
+        
+        data.forEach((unitKey, unitValue) {
+          print('QuizService: Processing unit "$unitKey"');
+          if (unitValue is Map) {
+            // Check if this is a unit containing quizzes
+            unitValue.forEach((quizKey, quizValue) {
+              if (quizValue is Map && quizValue.containsKey('title')) {
+                print('QuizService: Found quiz "${quizValue['title']}" in unit "$unitKey"');
+                quizzes.add({
+                  'id': quizKey,
+                  'title': quizValue['title']?.toString() ?? '',
+                  'date': quizValue['date']?.toString() ?? '',
+                  'unit': quizValue['unit']?.toString() ?? unitKey.toString().replaceAll('_', ' '),
+                  'questions': _parseQuestions(quizValue['facultyQuestions'] ?? quizValue['questions']),
+                  'duration': quizValue['duration']?.toString() ?? _calculateDuration(quizValue['questions']),
+                  'totalMarks': quizValue['totalMarks']?.toString() ?? '0',
+                  'pin': quizValue['pin']?.toString() ?? '',
+                  'instructions': quizValue['instructions']?.toString() ?? '',
+                  'isFromFaculty': true,
                 });
               }
+            });
+            
+            // Also handle backward compatibility for direct quizzes (not in units)
+            if (unitValue.containsKey('title') && unitValue.containsKey('questions')) {
+              // This is a direct quiz, not a unit (old format)
+              print('QuizService: Found direct quiz "${unitValue['title']}"');
+              quizzes.add({
+                'id': unitKey,
+                'title': unitValue['title']?.toString() ?? '',
+                'date': unitValue['date']?.toString() ?? '',
+                'unit': unitValue['unit']?.toString() ?? 'Unit 1',
+                'questions': _parseQuestions(unitValue['facultyQuestions'] ?? unitValue['questions']),
+                'duration': unitValue['duration']?.toString() ?? _calculateDuration(unitValue['questions']),
+                'totalMarks': unitValue['totalMarks']?.toString() ?? '0',
+                'pin': unitValue['pin']?.toString() ?? '',
+                'instructions': unitValue['instructions']?.toString() ?? '',
+                'isFromFaculty': true,
+              });
             }
-          });
-        }
+          }
+        });
+      } else {
+        print('QuizService: No data found in Firebase for key "$subjectKey"');
       }
       
-      print('QuizService: Found ${quizzes.length} quizzes');
+      print('QuizService: Returning ${quizzes.length} quizzes');
       return quizzes;
     } catch (e) {
-      print('QuizService Error: $e');
+      print('Error fetching quizzes for subject $subjectId: $e');
       return [];
     }
-  }
-
-  /// Helper to format raw Firebase data into a UI-friendly quiz map
-  Map<String, dynamic> _formatQuizFromData(dynamic key, dynamic value, String parentUnit) {
-    return {
-      'id': key.toString(),
-      'title': value['title']?.toString() ?? '',
-      'date': value['date']?.toString() ?? '',
-      'unit': value['unit']?.toString() ?? parentUnit.replaceAll('_', ' '),
-      'questions': _parseQuestions(value['facultyQuestions'] ?? value['questions']),
-      'duration': value['duration']?.toString() ?? _calculateDuration(value['questions']),
-      'totalMarks': value['totalMarks']?.toString() ?? '0',
-      'pin': value['pin']?.toString() ?? '',
-      'instructions': value['instructions']?.toString() ?? '',
-      'isFromFaculty': true,
-    };
   }
 
   /// Get all quizzes for all subjects
   Future<Map<String, List<Map<String, dynamic>>>> getAllQuizzes() async {
     await initialize();
+    
     Map<String, List<Map<String, dynamic>>> allQuizzes = {};
     
-    final List<String> subjects = [
-      'artificial_intelligence_programming_tools',
-      'cloud_computing',
-      'compiler_design',
-      'computer_networks',
-      'computer_organization_and_architecture',
-      'machine_learning',
-      'wireless_networks',
-      'internet_of_things',
-      'theory_of_computation',
-      'c_programming',
-    ];
+    // Define subject mappings using the actual subject IDs from the student portal
+    final Map<String, String> subjectMappings = {
+      'artificial_intelligence_programming_tools': 'Artificial_Intelligence_-_Programming_Tools',
+      'cloud_computing': 'Cloud_Computing',
+      'compiler_design': 'Compiler_Design',
+      'computer_networks': 'Computer_Networks',
+      'computer_organization_and_architecture': 'Computer_Organization_and_Architecture',
+      'machine_learning': 'Machine_Learning',
+      'wireless_networks': 'Wireless_Networks',
+      'internet_of_things': 'Internet_of_Things',
+      'theory_of_computation': 'Theory_of_Computation',
+      'c_programming': 'C_Programming',
+    };
     
-    for (String subjectId in subjects) {
+    for (String subjectId in subjectMappings.keys) {
       allQuizzes[subjectId] = await getQuizzesForSubject(subjectId);
     }
+    
     return allQuizzes;
   }
 
   /// Map student subject ID to faculty subject key
-  static String mapSubjectIdToFacultyKey(String subjectId) {
-    final String normalized = subjectId.toLowerCase()
-        .replaceAll(RegExp(r"[^a-z0-9]+"), '_')
-        .replaceAll(RegExp(r"^_+|_+$"), '');
-    
+  String _mapSubjectIdToFacultyKey(String subjectId) {
     final Map<String, String> mappings = {
-      'pydbasics': 'Artificial_Intelligence_-_Programming_Tools',
       'aipt': 'Artificial_Intelligence_-_Programming_Tools',
       'artificial_intelligence_programming_tools': 'Artificial_Intelligence_-_Programming_Tools',
       'cloud': 'Cloud_Computing',
@@ -129,86 +138,105 @@ class QuizService {
       'theory_of_computation': 'Theory_of_Computation',
       'toc': 'Theory_of_Computation',
       'c_programming': 'C_Programming',
-      'c_programming_language': 'C_Programming',
     };
     
-    if (mappings.containsKey(normalized)) {
-      return mappings[normalized]!;
-    }
-    
-    return normalized.split('_').map((word) {
-      if (word.isEmpty) return '';
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join('_');
+    return mappings[subjectId] ?? subjectId.replaceAll('_', '_');
   }
 
   /// Parse questions from Firebase data
   List<Map<String, dynamic>> _parseQuestions(dynamic questionsData) {
     List<Map<String, dynamic>> questions = [];
+    
     if (questionsData is List) {
       for (var question in questionsData) {
         if (question is Map) {
-          Map<String, dynamic> parsed = {};
-          question.forEach((k, v) {
-            if (v is List) {
-              parsed[k.toString()] = v.map((item) => item is Map ? Map<String, dynamic>.from(item) : item).toList();
-            } else if (v is Map) {
-              parsed[k.toString()] = Map<String, dynamic>.from(v);
-            } else {
-              parsed[k.toString()] = v;
-            }
+          questions.add({
+            'question': question['question']?.toString() ?? '',
+            'options': question['options'] is List 
+                ? List<String>.from(question['options']) 
+                : [],
+            'correct': question['correct'] ?? 0,
           });
-          questions.add(parsed);
         }
       }
     }
+    
     return questions;
   }
 
+  /// Calculate estimated duration based on number of questions
   String _calculateDuration(dynamic questionsData) {
-    int count = (questionsData is List) ? questionsData.length : 0;
-    return '${(count * 1.5).ceil()} min';
+    int questionCount = 0;
+    
+    if (questionsData is List) {
+      questionCount = questionsData.length;
+    }
+    
+    // Estimate 1.5 minutes per question
+    int estimatedMinutes = (questionCount * 1.5).ceil();
+    return '${estimatedMinutes} min';
   }
 
+  /// Get quizzes for a specific unit within a subject
   Future<List<Map<String, dynamic>>> getQuizzesForUnit(String subjectId, String unitName) async {
     await initialize();
-    final String subjectKey = mapSubjectIdToFacultyKey(subjectId);
+    
+    // Map student subject IDs to faculty subject labels
+    final String subjectKey = _mapSubjectIdToFacultyKey(subjectId);
     final String unitKey = unitName.replaceAll(' ', '_');
+    
     try {
       final snapshot = await _quizzesRef.child(subjectKey).child(unitKey).get();
       List<Map<String, dynamic>> quizzes = [];
-      if (snapshot.exists && snapshot.value is Map) {
-        (snapshot.value as Map).forEach((k, v) {
-          if (v is Map && v.containsKey('title')) {
-            quizzes.add(_formatQuizFromData(k, v, unitName));
+      
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((quizKey, quizValue) {
+          if (quizValue is Map && quizValue.containsKey('title')) {
+            quizzes.add({
+              'id': quizKey,
+              'title': quizValue['title']?.toString() ?? '',
+              'date': quizValue['date']?.toString() ?? '',
+              'unit': quizValue['unit']?.toString() ?? unitName,
+              'questions': _parseQuestions(quizValue['facultyQuestions'] ?? quizValue['questions']),
+              'duration': quizValue['duration']?.toString() ?? _calculateDuration(quizValue['questions']),
+              'totalMarks': quizValue['totalMarks']?.toString() ?? '0',
+              'instructions': quizValue['instructions']?.toString() ?? '',
+              'isFromFaculty': true,
+            });
           }
         });
       }
+      
       return quizzes;
     } catch (e) {
+      print('Error fetching quizzes for unit $unitName in subject $subjectId: $e');
       return [];
     }
   }
 
+  /// Listen to real-time updates for a subject's quizzes
   Stream<List<Map<String, dynamic>>> getQuizzesStream(String subjectId) {
-    final String subjectKey = mapSubjectIdToFacultyKey(subjectId);
+    final String subjectKey = _mapSubjectIdToFacultyKey(subjectId);
+    
     return _quizzesRef.child(subjectKey).onValue.map((event) {
       List<Map<String, dynamic>> quizzes = [];
-      if (event.snapshot.exists && event.snapshot.value is Map) {
-        (event.snapshot.value as Map).forEach((uk, uv) {
-          if (uv is Map) {
-            if (uv.containsKey('title')) {
-              quizzes.add(_formatQuizFromData(uk, uv, 'Unit 1'));
-            } else {
-              uv.forEach((qk, qv) {
-                if (qv is Map && qv.containsKey('title')) {
-                  quizzes.add(_formatQuizFromData(qk, qv, uk.toString()));
-                }
-              });
-            }
+      
+      if (event.snapshot.exists) {
+        final data = event.snapshot.value as Map<dynamic, dynamic>;
+        data.forEach((key, value) {
+          if (value is Map) {
+            quizzes.add({
+              'id': key,
+              'title': value['title']?.toString() ?? '',
+              'date': value['date']?.toString() ?? '',
+              'questions': _parseQuestions(value['questions']),
+              'duration': _calculateDuration(value['questions']),
+            });
           }
         });
       }
+      
       return quizzes;
     });
   }

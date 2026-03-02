@@ -27,10 +27,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
       "desc": "Browse all your subjects"
     },
     {
-      "title": "Assignments",
-      "icon": Icons.assignment,
+      "title": "Submit Assignments",
+      "icon": Icons.upload_file,
       "route": SubmitAssignmentPage(),
-      "desc": "View and submit assignments"
+      "desc": "Upload your assignments"
     },
     {
       "title": "View Progress",

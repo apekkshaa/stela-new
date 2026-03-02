@@ -1,21 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:stela_app/widgets/code_editor_widget.dart';
-import 'package:stela_app/models/quiz_model.dart';
 
 class QuizResultsScreen extends StatefulWidget {
   final Map<String, dynamic> quiz;
   final Map<String, dynamic> subject;
   final List<Map<String, dynamic>> questions;
-  final List<dynamic> userAnswers;
-  final double correctAnswers;
+  final List<int?> userAnswers;
+  final int correctAnswers;
   final double percentage;
-  final double totalMarks;
   final Duration timeTaken;
   final String? submissionDocId;
-  final Map<int, String> codingAnswers;
-  final Map<int, ProgrammingLanguage> codingLanguages;
-  final Map<int, String> subjectiveAnswers;
   const QuizResultsScreen({
     Key? key,
     required this.quiz,
@@ -25,11 +19,7 @@ class QuizResultsScreen extends StatefulWidget {
     required this.correctAnswers,
     required this.percentage,
     required this.timeTaken,
-    this.totalMarks = 0.0,
     this.submissionDocId,
-    this.codingAnswers = const {},
-    this.codingLanguages = const {},
-    this.subjectiveAnswers = const {},
   }) : super(key: key);
 
   @override
@@ -37,110 +27,6 @@ class QuizResultsScreen extends StatefulWidget {
 }
 
 class _QuizResultsScreenState extends State<QuizResultsScreen> {
-
-  final Map<int, double> _codingScores = <int, double>{};
-  final Map<int, int> _codingPassed = <int, int>{};
-  final Map<int, int> _codingTotal = <int, int>{};
-  bool _codingEvaluated = false;
-
-  double get _computedTotalMarks {
-    if (widget.totalMarks > 0) return widget.totalMarks;
-    double sum = 0;
-    for (final q in widget.questions) {
-      sum += _questionMaxMarks(q);
-    }
-    return sum;
-  }
-
-  double get _overallPercentage {
-    final denom = _computedTotalMarks > 0 ? _computedTotalMarks : 1;
-    return (widget.correctAnswers / denom) * 100.0;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _evaluateCodingQuestions();
-  }
-
-  Future<void> _evaluateCodingQuestions() async {
-    try {
-      for (int i = 0; i < widget.questions.length; i++) {
-        final q = widget.questions[i];
-        final type = (q['type'] ?? '').toString();
-        if (type != 'coding') continue;
-
-        final code = widget.codingAnswers[i] ?? '';
-        final testCases = (q['testCases'] ?? []) as List;
-        final solutionCode = q['solutionCode']?.toString() ?? '';
-        final studentLanguage = widget.codingLanguages[i] ?? _getProgrammingLanguage(q['language']?.toString());
-        final facultyLanguage = _getProgrammingLanguage(q['language']?.toString());
-
-        if (code.trim().isEmpty) {
-          _codingScores[i] = 0.0;
-          _codingPassed[i] = 0;
-          _codingTotal[i] = testCases.length;
-          continue;
-        }
-
-        if (testCases.isNotEmpty) {
-          final results = await SimulatedCodeRunner.runTests(
-            code: code,
-            testCasesData: testCases,
-            language: studentLanguage,
-            solutionLanguage: facultyLanguage,
-            solutionCode: solutionCode,
-            skipDelay: true,
-          );
-          final passed = results.where((r) => r.isPassed).length;
-          _codingPassed[i] = passed;
-          _codingTotal[i] = testCases.length;
-          _codingScores[i] = testCases.isEmpty ? 0.0 : (passed / testCases.length);
-        } else {
-          // No test cases and no solution code: cannot grade reliably
-          _codingPassed[i] = 0;
-          _codingTotal[i] = 0;
-          _codingScores[i] = 0.0;
-        }
-      }
-    } catch (e) {
-      // If anything goes wrong, don't crash results screen.
-      debugPrint('Error evaluating coding questions for results screen: $e');
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _codingEvaluated = true;
-    });
-  }
-
-  ProgrammingLanguage _getProgrammingLanguage(String? langStr) {
-    if (langStr == null) return ProgrammingLanguage.python;
-    try {
-      return ProgrammingLanguage.values.firstWhere(
-        (e) => e.name == langStr,
-        orElse: () => ProgrammingLanguage.python,
-      );
-    } catch (_) {
-      return ProgrammingLanguage.python;
-    }
-  }
-
-  String _fmtScore(double v) {
-    if (v % 1 == 0) return v.toInt().toString();
-    return v.toStringAsFixed(2);
-  }
-
-  double _questionMaxMarks(Map<String, dynamic> question) {
-    final type = (question['type'] ?? '').toString();
-    if (type == 'coding' || type == 'subjective' || type == 'mcq' || type.isEmpty) {
-      final v = question['marks'];
-      if (v is int) return v.toDouble();
-      if (v is double) return v;
-      if (v is String) return double.tryParse(v) ?? 1.0;
-    }
-    return 1.0;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -212,16 +98,16 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '${_overallPercentage.toStringAsFixed(1)}%',
+                          '${widget.percentage.toStringAsFixed(1)}%',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: _overallPercentage >= 70 ? Colors.green : Colors.orange,
+                            color: widget.percentage >= 70 ? Colors.green : Colors.orange,
                             fontFamily: 'PTSerif',
                           ),
                         ),
                         Text(
-                          '${_fmtScore(widget.correctAnswers)}/${_fmtScore(_computedTotalMarks)}',
+                          '${widget.correctAnswers}/${widget.questions.length}',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[600],
@@ -255,8 +141,8 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
               children: [
                 Expanded(
                   child: _buildStatCard(
-                    'Score',
-                    _fmtScore(widget.correctAnswers),
+                    'Correct',
+                    widget.correctAnswers.toString(),
                     Colors.green,
                     Icons.check_circle,
                   ),
@@ -264,10 +150,10 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: _buildStatCard(
-                    'Max Score',
-                    _fmtScore(_computedTotalMarks),
+                    'Incorrect',
+                    (widget.questions.length - widget.correctAnswers).toString(),
                     Colors.red,
-                    Icons.flag,
+                    Icons.cancel,
                   ),
                 ),
                 SizedBox(width: 8),
@@ -426,34 +312,8 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
   Widget _buildQuestionCard(int index) {
     final question = widget.questions[index];
     final userAnswer = widget.userAnswers[index];
-    final type = (question['type'] ?? '').toString();
     final correctAnswer = question['correct'];
-
-    final bool isCoding = type == 'coding';
-    final bool isSubjective = type == 'subjective';
-    final double? codingScore = isCoding ? _codingScores[index] : null;
-    final double maxMarks = _questionMaxMarks(question);
-
-    final bool isMcqCorrect = (!isCoding && !isSubjective && userAnswer != null && correctAnswer != null && userAnswer == correctAnswer);
-    final double earnedMarks = isCoding
-      ? ((codingScore ?? 0.0) * maxMarks)
-      : isSubjective
-        ? 0.0
-        : (isMcqCorrect ? maxMarks : 0.0);
-
-    final bool isFullCorrect = isCoding ? ((codingScore ?? 0.0) >= 0.999) : (isSubjective ? false : isMcqCorrect);
-    final bool isPartial = isCoding && _codingEvaluated && (codingScore ?? 0.0) > 0.0 && (codingScore ?? 0.0) < 0.999;
-    final bool isCorrect = isFullCorrect;
-
-    final bool isUngraded = isSubjective;
-
-    final Color borderColor = isUngraded
-      ? Colors.blueGrey
-      : (isPartial ? Colors.orange : (isFullCorrect ? Colors.green : Colors.red));
-    final IconData statusIcon = isUngraded
-      ? Icons.pending_actions
-      : (isPartial ? Icons.change_circle : (isFullCorrect ? Icons.check_circle : Icons.cancel));
-    final String statusText = isUngraded ? 'Ungraded' : (isPartial ? 'Partial' : (isFullCorrect ? 'Correct' : 'Incorrect'));
+    final isCorrect = userAnswer == correctAnswer;
     
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -461,7 +321,7 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: borderColor,
+          color: isCorrect ? Colors.green : Colors.red,
           width: 2,
         ),
         boxShadow: [
@@ -485,7 +345,7 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
                   height: 30,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: borderColor,
+                    color: isCorrect ? Colors.green : Colors.red,
                   ),
                   child: Center(
                     child: Text(
@@ -503,16 +363,16 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
                   child: Row(
                     children: [
                       Icon(
-                        statusIcon,
-                        color: borderColor,
+                        isCorrect ? Icons.check_circle : Icons.cancel,
+                        color: isCorrect ? Colors.green : Colors.red,
                         size: 20,
                       ),
                       SizedBox(width: 8),
                       Text(
-                        statusText,
+                        isCorrect ? 'Correct' : 'Incorrect',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: borderColor,
+                          color: isCorrect ? Colors.green : Colors.red,
                           fontFamily: 'PTSerif',
                         ),
                       ),
@@ -534,65 +394,8 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
             ),
             SizedBox(height: 12),
             
-            // Answer details
-            if (isCoding) ...[
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.code, color: Colors.purple),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _codingEvaluated
-                            ? 'Marks: ${_fmtScore(earnedMarks)}/${_fmtScore(maxMarks)}  (Passed: ${_codingPassed[index] ?? 0}/${_codingTotal[index] ?? 0})'
-                            : 'Evaluating coding question...',
-                        style: TextStyle(
-                          fontFamily: 'PTSerif',
-                          color: Colors.purple[800],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else if (isSubjective) ...[
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blueGrey.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Marks: 0/${_fmtScore(maxMarks)} (pending review)',
-                      style: TextStyle(
-                        fontFamily: 'PTSerif',
-                        color: Colors.blueGrey[800],
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Your answer:',
-                      style: TextStyle(fontFamily: 'PTSerif', fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      (widget.subjectiveAnswers[index] ?? '').trim().isEmpty ? '(No answer submitted)' : (widget.subjectiveAnswers[index] ?? ''),
-                      style: TextStyle(fontFamily: 'PTSerif'),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...List.generate(question['options']?.length ?? 0, (optionIndex) {
+            // Options
+            ...List.generate(question['options']?.length ?? 0, (optionIndex) {
               final option = question['options'][optionIndex];
               final isUserAnswer = userAnswer == optionIndex;
               final isCorrectAnswer = correctAnswer == optionIndex;
@@ -659,7 +462,7 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
   }
 
   String _getPerformanceMessage() {
-    final p = _overallPercentage;
+    final p = widget.percentage;
     if (p >= 90) return '🎉 Excellent! Outstanding performance!';
     if (p >= 80) return '👏 Great job! You\'re doing very well!';
     if (p >= 70) return '👍 Good work! Keep it up!';

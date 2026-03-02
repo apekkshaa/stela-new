@@ -21,7 +21,6 @@ class FacultySubjectPicker extends StatefulWidget {
 
 class _FacultySubjectPickerState extends State<FacultySubjectPicker> with TickerProviderStateMixin {
   String selectedCategory = 'All';
-  String _searchQuery = '';
   late AnimationController _headerController;
   late Animation<double> _fadeAnimation;
   
@@ -47,19 +46,12 @@ class _FacultySubjectPickerState extends State<FacultySubjectPicker> with Ticker
   }
 
   List<Map<String, dynamic>> get filteredSubjects {
-    final query = _searchQuery.trim().toLowerCase();
-    final categoryFiltered = selectedCategory == 'All'
-        ? widget.subjects
-        : widget.subjects
-            .where((subject) => subject['category'] == selectedCategory)
-            .toList();
-
-    if (query.isEmpty) return categoryFiltered;
-    return categoryFiltered.where((subject) {
-      final label = (subject['label'] ?? subject['title'] ?? '').toString().toLowerCase();
-      final category = (subject['category'] ?? '').toString().toLowerCase();
-      return label.contains(query) || category.contains(query);
-    }).toList();
+    if (selectedCategory == 'All') {
+      return widget.subjects;
+    }
+    return widget.subjects
+        .where((subject) => subject['category'] == selectedCategory)
+        .toList();
   }
 
   @override
@@ -216,19 +208,6 @@ class _FacultySubjectPickerState extends State<FacultySubjectPicker> with Ticker
                         );
                       },
                     ),
-                  ),
-                  SizedBox(height: 12),
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search subjects',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onChanged: (query) {
-                      setState(() => _searchQuery = query);
-                    },
                   ),
                   SizedBox(height: 20),
                   Text(
