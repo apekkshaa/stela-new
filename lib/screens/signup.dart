@@ -6,8 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 
 import 'package:stela_app/constants/colors.dart';
-import 'package:stela_app/screens/subjects.dart';
 import 'package:stela_app/screens/home.dart';
+import 'package:stela_app/screens/student_dashboard.dart';
 import 'package:stela_app/screens/faculty_signup.dart';
 import 'package:stela_app/screens/login.dart';
 import 'package:stela_app/screens/faculty_dashboard.dart';
@@ -421,7 +421,7 @@ class _SignUpState extends State<SignUp> with SingleTickerProviderStateMixin {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('userRole', 'Student');
 
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => Subjects()));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => StudentDashboard()));
       } else {
         // Faculty signup
         final cred = await _auth.createUserWithEmailAndPassword(email: _facultyEmail, password: _facultyPassword);
