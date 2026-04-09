@@ -24,7 +24,7 @@ class FacultyQuizTakingScreen extends StatefulWidget {
   _FacultyQuizTakingScreenState createState() => _FacultyQuizTakingScreenState();
 }
 
-class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
+class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with WidgetsBindingObserver {
   int currentQuestionIndex = 0;
   Map<int, int> selectedAnswers = {}; // For MCQ questions
   Map<int, String> codingAnswers = {}; // For coding questions
@@ -39,10 +39,12 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
   bool quizCompleted = false;
   DateTime? quizStartTime;
   bool _alreadySubmitted = false;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeQuiz();
   }
 
@@ -166,13 +168,33 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
           timeRemaining--;
         });
       } else {
-        _completeQuiz();
+        _completeQuiz(reason: 'time_up');
       }
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (quizCompleted || _isSubmitting || _alreadySubmitted) return;
+
+    final stateName = state.toString().split('.').last;
+    final movedAway =
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        stateName == 'hidden';
+
+    if (movedAway) {
+      _completeQuiz(
+        reason: 'focus_lost_$stateName',
+        autoTerminated: true,
+      );
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _subjectiveController.dispose();
     super.dispose();
@@ -191,7 +213,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       });
       _syncSubjectiveControllerIfNeeded();
     } else {
-      _completeQuiz();
+      _completeQuiz(reason: 'completed');
     }
   }
 
@@ -275,21 +297,35 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     );
   }
 
-  void _completeQuiz() {
+  void _completeQuiz({
+    String reason = 'completed',
+    bool autoTerminated = false,
+  }) {
+    if (quizCompleted || _isSubmitting || _alreadySubmitted) return;
+
     _timer?.cancel();
     setState(() {
       quizCompleted = true;
+      _isSubmitting = true;
     });
-    _showResults();
+    _showResults(
+      completionReason: reason,
+      autoTerminated: autoTerminated,
+    );
   }
 
-  Future<void> _showResults() async {
+  Future<void> _showResults({
+    required String completionReason,
+    required bool autoTerminated,
+  }) async {
     // Show loading while calculating
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Center(child: CircularProgressIndicator()),
-    );
+    if (!autoTerminated && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Center(child: CircularProgressIndicator()),
+      );
+    }
 
     double score = 0;
     double totalMarks = 0;
@@ -360,7 +396,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
     }
 
     // Dismiss loading
-    Navigator.pop(context);
+    if (!autoTerminated && mounted) {
+      Navigator.pop(context);
+    }
 
     double percentage = (score / (totalMarks > 0 ? totalMarks : 1)) * 100;
     
@@ -387,6 +425,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
           // Already submitted
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('You have already submitted this quiz. Multiple attempts are not allowed.')));
+            setState(() {
+              _isSubmitting = false;
+            });
           }
           return;
         }
@@ -533,6 +574,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
         'codingTestCasesPassedByQuestion': codingTestCasesPassedByQuestion,
         'codingTestCasesTotalByQuestion': codingTestCasesTotalByQuestion,
         'timeTakenSeconds': timeTaken.inSeconds,
+        'completionReason': completionReason,
+        'autoTerminated': autoTerminated,
+        'status': autoTerminated ? 'terminated_focus_loss' : 'submitted',
         'timestamp': FieldValue.serverTimestamp(),
         // mark as sent to faculty immediately when student submits
         'sentToFaculty': FieldValue.serverTimestamp(),
@@ -560,7 +604,13 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       // Show brief confirmation to student (non-blocking)
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Quiz submitted successfully — results sent to faculty')),
+          SnackBar(
+            content: Text(
+              autoTerminated
+                  ? 'Quiz auto-ended due to screen/tab change. Results sent to faculty.'
+                  : 'Quiz submitted successfully. Results sent to faculty.',
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -587,6 +637,12 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
         ),
       ),
     );
+
+    if (mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 
   String _formatTime(int seconds) {
@@ -677,9 +733,18 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
       _syncSubjectiveControllerIfNeeded();
     }
 
-    return Scaffold(
-      backgroundColor: primaryWhite,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: () async {
+        if (quizCompleted || _isSubmitting || _alreadySubmitted) return true;
+        _completeQuiz(
+          reason: 'left_quiz_screen',
+          autoTerminated: true,
+        );
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: primaryWhite,
+        appBar: AppBar(
         title: Text(widget.quiz['title']),
         backgroundColor: widget.subject['color'],
         foregroundColor: Colors.white,
@@ -705,7 +770,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
           ),
         ],
       ),
-      body: Column(
+        body: Column(
         children: [
           // Progress indicator
           Container(
@@ -1068,6 +1133,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

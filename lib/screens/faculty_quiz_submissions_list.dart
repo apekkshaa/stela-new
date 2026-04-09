@@ -114,11 +114,14 @@ class FacultyQuizSubmissionsList extends StatelessWidget {
               final earnedMarks = (d['correctAnswers'] ?? d['correct'] ?? 0) as num;
               final totalMarks = (d['totalMarks'] ?? 0) as num;
               final timestamp = (d['timestamp'] as Timestamp?)?.toDate()?.toString().split('.')[0] ?? '';
+                final isAutoTerminated = (d['autoTerminated'] == true) ||
+                  (d['status']?.toString() == 'terminated_focus_loss');
+                final statusText = isAutoTerminated ? 'AUTO-ENDED' : 'SUBMITTED';
 
               return Card(
                 child: ListTile(
                   title: Text('$studentName — $qTitle'),
-                  subtitle: Text('Marks: ${_fmtScore(earnedMarks)}${totalMarks > 0 ? ' / ${_fmtScore(totalMarks)}' : ''} • $timestamp'),
+                  subtitle: Text('Marks: ${_fmtScore(earnedMarks)}${totalMarks > 0 ? ' / ${_fmtScore(totalMarks)}' : ''} • $statusText • $timestamp'),
                   trailing: IconButton(
                     icon: Icon(Icons.delete, color: Colors.redAccent),
                     tooltip: 'Delete submission',
