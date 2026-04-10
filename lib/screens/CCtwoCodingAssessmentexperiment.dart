@@ -230,9 +230,7 @@ else {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           title: Text('STELA'),
           backgroundColor: primaryBar,
@@ -986,7 +984,6 @@ int differenceInSeconds = difference.inSeconds%60;
             ),
           ),
         ),
-      ),
     );
   }
 String section1Text = '';

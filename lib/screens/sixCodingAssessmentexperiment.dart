@@ -98,9 +98,7 @@ print(result_string)'''),
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           title: Text('STELA'),
           backgroundColor: primaryBar,
@@ -727,7 +725,6 @@ PLEASE WAIT FOR A FEW SECONDS TILL YOU SEE THE OUTPUT''',
             ),
           ),
         ),
-      ),
     );
   }
 String section1Text = '';

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:stela_app/splash.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'package:stela_app/theme/app_theme.dart';
 //import 'globals.dart';
 import 'package:stela_app/screens/globals.dart';
 
@@ -46,13 +47,13 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
+    const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // title: 'Splash Screen',
-      // theme: ThemeData(
-      //   primarySwatch: Colors.green,
-      // ),
+            title: 'STELA',
+            theme: AppTheme.light,
       home: Splash(),
       debugShowCheckedModeBanner: false,
     );

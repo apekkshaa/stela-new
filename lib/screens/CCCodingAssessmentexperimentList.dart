@@ -107,9 +107,7 @@ class _CodingAssessmentExperimentListState
       colChildren.add(new ListTile());
     }
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -221,7 +219,6 @@ class _CodingAssessmentExperimentListState
             ],
           ),
         ),
-      ),
     );
   }
 }*/
@@ -254,9 +251,7 @@ class _CCCodingAssessmentExperimentListState extends State<CCCodingAssessmentExp
       colChildren.add(new ListTile());
     }
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -410,7 +405,6 @@ class _CCCodingAssessmentExperimentListState extends State<CCCodingAssessmentExp
             ],
           ),
         ),
-      ),
     );
   }
 }

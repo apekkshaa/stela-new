@@ -102,9 +102,7 @@ print result_string '''),
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           title: Text('STELA'),
           backgroundColor: primaryBar,
@@ -742,7 +740,6 @@ Pandas DataFrame created successfully.\n''',
             ),
           ),
         ),
-      ),
     );
   }
 String section1Text = '';

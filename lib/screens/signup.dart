@@ -60,9 +60,7 @@ class _SignUpState extends State<SignUp> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: GestureDetector(
+    return GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
           backgroundColor: primaryWhite,
@@ -189,7 +187,6 @@ class _SignUpState extends State<SignUp> with SingleTickerProviderStateMixin {
             ),
           ),
         ),
-      ),
     );
   }
 

@@ -11,9 +11,7 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryBar,
         body: LayoutBuilder(
           builder: (context, constraints) {
@@ -113,7 +111,6 @@ class _HomeState extends State<Home> {
             );
           },
         ),
-      ),
     );
   }
 }

@@ -14,9 +14,7 @@ class _ContactUsState extends State<ContactUs> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
+    return Scaffold(
             backgroundColor: primaryWhite,
             bottomNavigationBar: BottomAppBar(
               color: primaryBar,
@@ -157,7 +155,7 @@ class _ContactUsState extends State<ContactUs> {
                           ),*/
                         ]))),
               ),
-            )));
+            ));
   }
 }
 

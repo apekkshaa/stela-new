@@ -168,8 +168,7 @@ late Timer _timer;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
+    return Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
           title: Text('Assessment'),
@@ -693,7 +692,6 @@ int differenceInSeconds = difference.inSeconds%60;
             ],
           ),
         ),
-      ),
     );
   }
 

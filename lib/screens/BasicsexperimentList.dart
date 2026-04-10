@@ -25,9 +25,7 @@ class _BasicsExperimentListState extends State<BasicsExperimentList> {
       colChildren.add(new ListTile());
     }
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -504,7 +502,6 @@ class _BasicsExperimentListState extends State<BasicsExperimentList> {
             ],
           ),
         ),
-      ),
     );
   }
 }

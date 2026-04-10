@@ -122,9 +122,7 @@ class _CCTutorialState extends State<CCTutorial> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -157,7 +155,7 @@ class _CCTutorialState extends State<CCTutorial> {
                                   fontFamily: 'PTSerif-Bold',
                                   fontWeight: FontWeight.w900,
                                 ))),
-                        /*Container(
+                      }
                           width: 50,
                           margin: EdgeInsets.all(10),
                           child: ClipRRect(

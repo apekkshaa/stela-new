@@ -34,9 +34,7 @@ class _PracticeModuleState extends State<PracticeModule> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -179,7 +177,6 @@ class _PracticeModuleState extends State<PracticeModule> {
             ],
           ),
         ),
-      ),
     );
   }
 }

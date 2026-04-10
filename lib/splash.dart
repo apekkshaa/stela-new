@@ -25,13 +25,14 @@ class Splash extends StatelessWidget {
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
+              fontFamily: 'PTSerif',
             ),
           ),
         ],
       ),
       splashIconSize: 250,
-      backgroundColor: primaryWhite, // or Colors.black if using white text/logo
-  nextScreen: AuthGate(),
+      backgroundColor: primaryBar,
+      nextScreen: AuthGate(),
       splashTransition: SplashTransition.fadeTransition,
       pageTransitionType: PageTransitionType.fade,
     );

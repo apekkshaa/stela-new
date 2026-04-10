@@ -88,8 +88,7 @@ class _AIPTAssessmentPageState extends State<AIPTAssessmentPage> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           title: Text('Assessment'),
         ),
@@ -109,7 +108,6 @@ class _AIPTAssessmentPageState extends State<AIPTAssessmentPage> {
             ],
           ),
         ),
-      ),
     );
   }
 

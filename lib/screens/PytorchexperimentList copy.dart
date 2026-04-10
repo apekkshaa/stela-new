@@ -26,9 +26,7 @@ class _PytorchExperimentListState extends State<PytorchExperimentList> {
       colChildren.add(new ListTile());
     }
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -465,7 +463,6 @@ Container(
             ],
           ),
         ),
-      ),
     );
   }
 }

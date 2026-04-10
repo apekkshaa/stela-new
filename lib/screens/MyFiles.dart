@@ -30,9 +30,7 @@ class _MyFilesState extends State<MyFiles> {
       colChildren.add(new ListTile());
     }
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -164,9 +162,7 @@ if (event.snapshot.value != null) {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -366,7 +362,6 @@ SizedBox(height: 50),
             ],
           ),
         ),
-      ),
     );
   }
 }

@@ -45,9 +45,7 @@ class Experiment extends StatelessWidget {
     fetchData();
     // Define a TextEditingController to manage the text in the TextField
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -651,7 +649,6 @@ for (var imageData in imageResult) {
             ],
           ),
         ),
-      ),
     );
     return Container();
   }

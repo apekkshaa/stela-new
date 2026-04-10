@@ -148,9 +148,7 @@ while (i < 5):
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           title: Text('STELA'),
           backgroundColor: primaryBar,
@@ -808,7 +806,6 @@ x is between 5 and 15
             ),
           ),
         ),
-      ),
     );
   }
 String section1Text = '';

@@ -57,9 +57,7 @@ class _LoginState extends State<Login> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: GestureDetector(
+    return GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Scaffold(
           backgroundColor: primaryWhite,
@@ -401,7 +399,6 @@ class _LoginState extends State<Login> {
             ),
           ),
         ),
-      ),
     );
   }
 

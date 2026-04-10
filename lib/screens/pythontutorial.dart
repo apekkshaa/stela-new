@@ -137,9 +137,7 @@ class _PythonTutorialState extends State<PythonTutorial> {
        bool isFaculty = enrollmentNo == "FACULTY" || enrollmentNo == "Faculty";
 
 
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -1208,7 +1206,6 @@ TextButton(
             ],
           ),
         ),
-      ),
     );
   }
 }

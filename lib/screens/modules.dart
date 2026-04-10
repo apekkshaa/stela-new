@@ -20,9 +20,7 @@ class _ModulesState extends State<Modules> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
+    return Scaffold(
         backgroundColor: primaryWhite,
         appBar: AppBar(
           title: Text('STELA'),
@@ -360,7 +358,6 @@ SizedBox(height: 100),
             ],
           ),
         ),
-      ),
     );
   }
 }

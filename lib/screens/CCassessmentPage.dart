@@ -174,8 +174,7 @@ late String section2= controller.text;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
+    return Scaffold(
         key: _scaffoldKey,
         appBar: AppBar(
           title: Text('Assessment'),
@@ -798,7 +797,6 @@ class _CCAssessmentPageState extends State<CCAssessmentPage> {
             ],
           ),
         ),
-      ),
     );
   }
 
