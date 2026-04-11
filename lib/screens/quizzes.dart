@@ -1716,11 +1716,17 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
       }
 
       String studentName = '';
+      String studentEnrollment = '';
       try {
         final doc = await FirebaseFirestore.instance.collection('students').doc(user.uid).get();
-        if (doc.exists) studentName = (doc.data()?['name'] ?? '').toString();
+        if (doc.exists) {
+          final sd = doc.data();
+          studentName = (sd?['name'] ?? '').toString();
+          studentEnrollment =
+              (sd?['enrollmentNumber'] ?? sd?['enrollmentNo'] ?? '').toString();
+        }
       } catch (e) {
-        print('Error reading student name: $e');
+        print('Error reading student profile: $e');
       }
 
       // Convert maps to lists for storage
@@ -1738,6 +1744,8 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
         'subjectId': quizMap != null ? (quizMap['id'] ?? '') : '',
         'studentId': user.uid,
         'studentName': studentName,
+        'enrollmentNumber': studentEnrollment,
+        'enrollmentNo': studentEnrollment,
         'answers': mcqAnswersList,
         'codingAnswers': codingAnswersList,
         'codingLanguages': codingLanguagesList,

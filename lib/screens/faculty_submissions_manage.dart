@@ -18,6 +18,74 @@ class FacultySubmissionsManage extends StatefulWidget {
 class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
   String facultyId = '';
 
+  bool _looksMaskedEnrollment(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return false;
+    // Ignore placeholders like XXXXXXXX or ****** so export can fall back to real sources.
+    return RegExp(r'^[Xx*#-]{4,}$').hasMatch(v);
+  }
+
+  String _extractEnrollmentFromData(Map<String, dynamic> data) {
+    final candidates = [
+      data['enrollmentNumber'],
+      data['enrollmentNo'],
+      data['studentEnrollment'],
+      data['studentEnrollmentNumber'],
+    ];
+    for (final c in candidates) {
+      final s = (c ?? '').toString().trim();
+      if (s.isNotEmpty && !_looksMaskedEnrollment(s)) {
+        return s;
+      }
+    }
+    return '';
+  }
+
+  Future<Map<String, String>> _buildEnrollmentCache(Set<String> studentIds) async {
+    final cache = <String, String>{};
+    if (studentIds.isEmpty) return cache;
+
+    try {
+      final studentFutures = studentIds
+          .map((id) => FirebaseFirestore.instance.collection('students').doc(id).get());
+      final studentSnaps = await Future.wait(studentFutures);
+      for (final s in studentSnaps) {
+        if (!s.exists) continue;
+        final sd = s.data();
+        if (sd == null) continue;
+        final enrollment = _extractEnrollmentFromData(sd);
+        if (enrollment.isNotEmpty) {
+          cache[s.id] = enrollment;
+        }
+      }
+    } catch (e) {
+      print('Error fetching student enrollments from students collection: $e');
+    }
+
+    // Legacy fallback for apps that keep profile fields in a generic users collection.
+    final missingIds = studentIds.where((id) => !cache.containsKey(id)).toList();
+    if (missingIds.isEmpty) return cache;
+
+    try {
+      final userFutures = missingIds
+          .map((id) => FirebaseFirestore.instance.collection('users').doc(id).get());
+      final userSnaps = await Future.wait(userFutures);
+      for (final u in userSnaps) {
+        if (!u.exists) continue;
+        final ud = u.data();
+        if (ud == null) continue;
+        final enrollment = _extractEnrollmentFromData(ud);
+        if (enrollment.isNotEmpty) {
+          cache[u.id] = enrollment;
+        }
+      }
+    } catch (e) {
+      print('Error fetching student enrollments from users collection: $e');
+    }
+
+    return cache;
+  }
+
   double _questionMaxMarks(Map<String, dynamic> question) {
     final type = (question['type'] ?? '').toString();
     if (type == 'coding') {
@@ -216,34 +284,24 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         'Unit',
       ]);
 
-      // Build a cache of student enrollment numbers to avoid repeated reads
-      final Map<String, String> enrollmentCache = {};
+      // Build a cache of student enrollment numbers to avoid repeated reads.
       final Set<String> studentIds = {};
       for (var doc in docs) {
         final sid = (doc.data()['studentId'] ?? '').toString();
         if (sid.isNotEmpty) studentIds.add(sid);
       }
-      // Fetch student docs concurrently
-      try {
-        final futures = studentIds.map((id) => FirebaseFirestore.instance.collection('students').doc(id).get());
-        final snaps = await Future.wait(futures);
-        for (var s in snaps) {
-          if (s.exists) {
-            final sd = s.data();
-            if (sd != null) {
-              enrollmentCache[s.id] = sd['enrollmentNumber'] ?? sd['enrollmentNo'] ?? '';
-            }
-          }
-        }
-      } catch (e) {
-        print('Error fetching student enrollments: $e');
-      }
+      final enrollmentCache = await _buildEnrollmentCache(studentIds);
 
       for (var doc in docs) {
         final data = doc.data();
         final timestamp = (data['timestamp'] as Timestamp?)?.toDate().toIso8601String() ?? '';
-  final studentId = data['studentId'] ?? '';
-  final enrollmentNumber = (studentId != '' ? (enrollmentCache[studentId] ?? '') : '');
+      final studentId = data['studentId'] ?? '';
+      final inlineEnrollment = _extractEnrollmentFromData(data);
+      final cachedEnrollment =
+        (studentId != '' ? (enrollmentCache[studentId] ?? '') : '');
+      final enrollmentNumber = inlineEnrollment.isNotEmpty
+        ? inlineEnrollment
+        : cachedEnrollment;
         final studentName = data['studentName'] ?? '';
         final marksGained = data['correctAnswers'] ?? data['correct'] ?? 0;
         final totalMarks = _computeTotalMarksFromSubmission(data);
@@ -381,34 +439,25 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
         'Unit',
       ]);
 
-      // Build cache for student enrollment numbers
-      final Map<String, String> enrollmentCache = {};
+      // Build cache for student enrollment numbers.
       final Set<String> studentIds = {};
       for (var doc in filteredDocs) {
         final sid = (doc.data()['studentId'] ?? '').toString();
         if (sid.isNotEmpty) studentIds.add(sid);
       }
-      try {
-        final futures = studentIds.map((id) => FirebaseFirestore.instance.collection('students').doc(id).get());
-        final snaps = await Future.wait(futures);
-        for (var s in snaps) {
-          if (s.exists) {
-            final sd = s.data();
-            if (sd != null) {
-              enrollmentCache[s.id] = sd['enrollmentNumber'] ?? sd['enrollmentNo'] ?? '';
-            }
-          }
-        }
-      } catch (e) {
-        print('Error fetching student enrollments: $e');
-      }
+      final enrollmentCache = await _buildEnrollmentCache(studentIds);
 
       for (var doc in filteredDocs) {
         final data = doc.data();
         final timestamp = (data['timestamp'] as Timestamp?)?.toDate().toIso8601String() ?? '';
         final studentId = data['studentId'] ?? '';
         final studentName = data['studentName'] ?? '';
-        final enrollmentNumber = (studentId != '' ? (enrollmentCache[studentId] ?? '') : '');
+        final inlineEnrollment = _extractEnrollmentFromData(data);
+        final cachedEnrollment =
+          (studentId != '' ? (enrollmentCache[studentId] ?? '') : '');
+        final enrollmentNumber = inlineEnrollment.isNotEmpty
+          ? inlineEnrollment
+          : cachedEnrollment;
         final marksGained = data['correctAnswers'] ?? data['correct'] ?? 0;
         final totalMarks = _computeTotalMarksFromSubmission(data);
         final timeTaken = data['timeTakenSeconds']?.toString() ?? data['timeTaken']?.toString() ?? '';
