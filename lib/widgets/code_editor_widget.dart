@@ -74,7 +74,7 @@ class _CodeEditorWidgetState extends State<CodeEditorWidget> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Color(0xFF1E1E1E), // VS Code dark theme background
+        color: Colors.black,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey.shade700),
       ),
@@ -158,27 +158,35 @@ class _CodeEditorWidgetState extends State<CodeEditorWidget> {
                 
                 // Code input area
                 Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    readOnly: widget.readOnly,
-                    maxLines: null,
-                    expands: true,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontFamily: 'monospace',
-                      height: 1.5,
-                    ),
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
+                  child: Container(
+                    color: Colors.black,
+                    child: TextField(
+                      controller: _controller,
+                      readOnly: widget.readOnly,
+                      maxLines: null,
+                      expands: true,
+                      textAlign: TextAlign.start,
+                      textAlignVertical: TextAlignVertical.top,
+                      cursorColor: Colors.white,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontFamily: 'monospace',
+                        height: 1.5,
                       ),
-                      hintText: widget.readOnly ? '' : 'Write your code here...',
-                      hintStyle: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontStyle: FontStyle.italic,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        filled: true,
+                        fillColor: Colors.black,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        hintText: widget.readOnly ? '' : 'Write code here...',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ),
                   ),

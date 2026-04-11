@@ -1006,6 +1006,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
                           // Code editor
                           Container(
                             height: 400,
+                            color: Colors.black,
                             child: CodeEditorWidget(
                               language: codingLanguages[currentQuestionIndex] ?? _getProgrammingLanguage(currentQuestion['language']?.toString()),
                               initialCode: codingAnswers[currentQuestionIndex] ?? '',

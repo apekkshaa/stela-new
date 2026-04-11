@@ -1502,6 +1502,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                                     Container(
                                       height: 300,
                                       decoration: BoxDecoration(
+                                        color: Colors.black,
                                         border: Border.all(color: Colors.grey[300]!),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
