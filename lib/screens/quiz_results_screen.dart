@@ -142,6 +142,40 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
     return 1.0;
   }
 
+  List<String> _extractQuestionKeywords(Map<String, dynamic> question) {
+    final raw = question['keywords'];
+    if (raw is List) {
+      return raw
+          .map((k) => k.toString().trim().toLowerCase())
+          .where((k) => k.isNotEmpty)
+          .toSet()
+          .toList();
+    }
+    if (raw is String) {
+      return raw
+          .split(RegExp(r'[,;\n]+'))
+          .map((k) => k.trim().toLowerCase())
+          .where((k) => k.isNotEmpty)
+          .toSet()
+          .toList();
+    }
+    return <String>[];
+  }
+
+  List<String> _matchKeywordsInAnswer(String answer, List<String> keywords) {
+    final normalizedAnswer = answer.toLowerCase();
+    final matched = <String>[];
+    for (final keyword in keywords) {
+      final escaped = RegExp.escape(keyword.trim());
+      if (escaped.isEmpty) continue;
+      final pattern = RegExp(r'(^|[^a-z0-9])' + escaped + r'([^a-z0-9]|$)', caseSensitive: false);
+      if (pattern.hasMatch(normalizedAnswer)) {
+        matched.add(keyword);
+      }
+    }
+    return matched;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -433,27 +467,41 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
     final bool isSubjective = type == 'subjective';
     final double? codingScore = isCoding ? _codingScores[index] : null;
     final double maxMarks = _questionMaxMarks(question);
+    final String subjectiveAnswer = isSubjective ? ((widget.subjectiveAnswers[index] ?? '').toString()) : '';
+    final List<String> subjectiveKeywords = isSubjective ? _extractQuestionKeywords(question) : const <String>[];
+    final List<String> matchedKeywords = isSubjective
+      ? _matchKeywordsInAnswer(subjectiveAnswer, subjectiveKeywords)
+      : const <String>[];
+    final double subjectiveScore = (isSubjective && subjectiveKeywords.isNotEmpty)
+      ? (matchedKeywords.length / subjectiveKeywords.length) * maxMarks
+      : 0.0;
 
     final bool isMcqCorrect = (!isCoding && !isSubjective && userAnswer != null && correctAnswer != null && userAnswer == correctAnswer);
     final double earnedMarks = isCoding
       ? ((codingScore ?? 0.0) * maxMarks)
       : isSubjective
-        ? 0.0
+        ? subjectiveScore
         : (isMcqCorrect ? maxMarks : 0.0);
 
-    final bool isFullCorrect = isCoding ? ((codingScore ?? 0.0) >= 0.999) : (isSubjective ? false : isMcqCorrect);
+    final bool isFullCorrect = isCoding
+      ? ((codingScore ?? 0.0) >= 0.999)
+      : (isSubjective ? (subjectiveKeywords.isNotEmpty && matchedKeywords.length == subjectiveKeywords.length) : isMcqCorrect);
     final bool isPartial = isCoding && _codingEvaluated && (codingScore ?? 0.0) > 0.0 && (codingScore ?? 0.0) < 0.999;
     final bool isCorrect = isFullCorrect;
 
-    final bool isUngraded = isSubjective;
+    final bool isSubjectiveUngraded = isSubjective && subjectiveKeywords.isEmpty;
+    final bool isPartialSubjective = isSubjective && subjectiveKeywords.isNotEmpty && matchedKeywords.isNotEmpty && matchedKeywords.length < subjectiveKeywords.length;
+    final bool isUngraded = isSubjectiveUngraded;
 
     final Color borderColor = isUngraded
       ? Colors.blueGrey
-      : (isPartial ? Colors.orange : (isFullCorrect ? Colors.green : Colors.red));
+      : ((isPartial || isPartialSubjective) ? Colors.orange : (isFullCorrect ? Colors.green : Colors.red));
     final IconData statusIcon = isUngraded
       ? Icons.pending_actions
-      : (isPartial ? Icons.change_circle : (isFullCorrect ? Icons.check_circle : Icons.cancel));
-    final String statusText = isUngraded ? 'Ungraded' : (isPartial ? 'Partial' : (isFullCorrect ? 'Correct' : 'Incorrect'));
+      : ((isPartial || isPartialSubjective) ? Icons.change_circle : (isFullCorrect ? Icons.check_circle : Icons.cancel));
+    final String statusText = isUngraded
+        ? 'Ungraded'
+        : ((isPartial || isPartialSubjective) ? 'Partial' : (isFullCorrect ? 'Correct' : 'Incorrect'));
     
     return Container(
       margin: EdgeInsets.only(bottom: 12),
@@ -573,7 +621,9 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Marks: 0/${_fmtScore(maxMarks)} (pending review)',
+                      isSubjectiveUngraded
+                          ? 'Marks: 0/${_fmtScore(maxMarks)} (pending review)'
+                          : 'Marks: ${_fmtScore(earnedMarks)}/${_fmtScore(maxMarks)} (auto-graded)',
                       style: TextStyle(
                         fontFamily: 'PTSerif',
                         color: Colors.blueGrey[800],
@@ -586,7 +636,7 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      (widget.subjectiveAnswers[index] ?? '').trim().isEmpty ? '(No answer submitted)' : (widget.subjectiveAnswers[index] ?? ''),
+                      subjectiveAnswer.trim().isEmpty ? '(No answer submitted)' : subjectiveAnswer,
                       style: TextStyle(fontFamily: 'PTSerif'),
                     ),
                   ],

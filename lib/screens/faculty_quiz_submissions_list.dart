@@ -163,6 +163,30 @@ class FacultyQuizSubmissionsList extends StatelessWidget {
                       final answers = List<dynamic>.from(d['answers'] ?? []);
                       final codingAnswers = List<dynamic>.from(d['codingAnswers'] ?? []);
                       final subjectiveAnswers = List<dynamic>.from(d['subjectiveAnswers'] ?? []);
+                        final subjectiveKeywordScores = (d['subjectiveKeywordScoreByQuestion'] as List?)
+                            ?.map((e) => (e as num?)?.toDouble() ?? 0.0)
+                            .toList() ??
+                          const <double>[];
+                        final subjectiveMatchedKeywordsRaw = d['subjectiveMatchedKeywordsByQuestion'];
+                        final subjectiveMatchedKeywordsByIndex = <int, List<String>>{};
+                        if (subjectiveMatchedKeywordsRaw is List) {
+                          for (int i = 0; i < subjectiveMatchedKeywordsRaw.length; i++) {
+                            subjectiveMatchedKeywordsByIndex[i] =
+                                List<String>.from((subjectiveMatchedKeywordsRaw[i] as List?) ?? const <String>[]);
+                          }
+                        } else if (subjectiveMatchedKeywordsRaw is Map) {
+                          subjectiveMatchedKeywordsRaw.forEach((k, v) {
+                            final idx = int.tryParse(k.toString());
+                            if (idx != null) {
+                              subjectiveMatchedKeywordsByIndex[idx] =
+                                  List<String>.from((v as List?) ?? const <String>[]);
+                            }
+                          });
+                        }
+                        final subjectiveTotalKeywords = (d['subjectiveTotalKeywordsByQuestion'] as List?)
+                            ?.map((e) => (e as num?)?.toInt() ?? 0)
+                            .toList() ??
+                          const <int>[];
 
                       final earnedMarks = (d['correctAnswers'] ?? d['correct'] ?? 0) as num;
                       final storedTotalMarks = (d['totalMarks'] ?? 0) as num;
@@ -250,12 +274,34 @@ class FacultyQuizSubmissionsList extends StatelessWidget {
 
                                   if (isSubjective) {
                                     final ans = subjectiveAnswers.length > index ? subjectiveAnswers[index].toString() : '';
+                                    final keywordScore =
+                                        subjectiveKeywordScores.length > index ? subjectiveKeywordScores[index] : 0.0;
+                                    final matched = subjectiveMatchedKeywordsByIndex[index] ?? const <String>[];
+                                    final totalKeywords =
+                                        subjectiveTotalKeywords.length > index ? subjectiveTotalKeywords[index] : 0;
+                                    final maxMarks = _questionMaxMarks(q);
                                     return Padding(
                                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text('${index + 1}. [Subjective] ${q['question'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          SizedBox(height: 6),
+                                          Text(
+                                            'Auto score: ${_fmtScore(keywordScore)} / ${_fmtScore(maxMarks)}',
+                                            style: TextStyle(fontSize: 12, color: Colors.blueGrey[700]),
+                                          ),
+                                          Text(
+                                            totalKeywords > 0
+                                                ? 'Keyword matches: ${matched.length}/$totalKeywords'
+                                                : 'Keyword matches: no keywords configured',
+                                            style: TextStyle(fontSize: 12, color: Colors.blueGrey[700]),
+                                          ),
+                                          if (matched.isNotEmpty)
+                                            Text(
+                                              'Matched keywords: ${matched.join(', ')}',
+                                              style: TextStyle(fontSize: 12, color: Colors.green[700]),
+                                            ),
                                           SizedBox(height: 6),
                                           Container(
                                             width: double.infinity,

@@ -29,6 +29,7 @@ class QuizQuestion {
 
   // Subjective specific fields
   final String? expectedAnswer;
+  final List<String>? keywords;
   
   QuizQuestion({
     required this.id,
@@ -44,6 +45,7 @@ class QuizQuestion {
     this.solutionCode,
     // Subjective fields
     this.expectedAnswer,
+    this.keywords,
   });
 
   // Factory constructor for MCQ questions
@@ -86,12 +88,14 @@ class QuizQuestion {
     required String id,
     required String question,
     String? expectedAnswer,
+    List<String>? keywords,
   }) {
     return QuizQuestion(
       id: id,
       type: QuestionType.subjective,
       question: question,
       expectedAnswer: expectedAnswer,
+      keywords: keywords,
     );
   }
 
@@ -114,6 +118,15 @@ class QuizQuestion {
     } else if (type == QuestionType.subjective) {
       if (expectedAnswer != null && expectedAnswer!.trim().isNotEmpty) {
         map['expectedAnswer'] = expectedAnswer;
+      }
+      if (keywords != null && keywords!.isNotEmpty) {
+        final normalized = keywords!
+            .map((k) => k.trim())
+            .where((k) => k.isNotEmpty)
+            .toList();
+        if (normalized.isNotEmpty) {
+          map['keywords'] = normalized;
+        }
       }
     }
 
@@ -141,6 +154,9 @@ class QuizQuestion {
         id: map['id'] ?? '',
         question: map['question'] ?? '',
         expectedAnswer: map['expectedAnswer']?.toString(),
+        keywords: (map['keywords'] as List<dynamic>?)
+            ?.map((k) => k.toString())
+            .toList(),
       );
     } else {
       final langStr = map['language'] as String?;

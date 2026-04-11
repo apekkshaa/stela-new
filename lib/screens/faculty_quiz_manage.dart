@@ -482,6 +482,16 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
           }
         }
 
+        List<String> parseKeywords(String? raw) {
+          if (raw == null || raw.trim().isEmpty) return <String>[];
+          return raw
+              .split(RegExp(r'[,;\n]+'))
+              .map((k) => k.trim().toLowerCase())
+              .where((k) => k.isNotEmpty)
+              .toSet()
+              .toList();
+        }
+
         for (var table in excel.tables.keys) {
           var sheet = excel.tables[table]!;
           bool isHeaderRow = true;
@@ -596,11 +606,14 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
               } else if (type == 'subjective') {
                 final marks = cellInt(row, headers, ['marks']) ?? 1;
                 final expectedAnswer = cellString(row, headers, ['expectedanswer', 'expected_answer']) ?? '';
+                final keywordsRaw = cellString(row, headers, ['keywords', 'keyword', 'key_terms', 'keyterms']);
+                final keywords = parseKeywords(keywordsRaw);
                 questions.add({
                   'type': 'subjective',
                   'question': questionText,
                   'marks': marks,
                   'expectedAnswer': expectedAnswer,
+                  'keywords': keywords,
                 });
               } else {
                 // Default to MCQ
@@ -946,6 +959,18 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
 
         // Preserve coding and subjective as-is (they already store richer fields).
         if (type == 'coding' || type == 'subjective') {
+          if (type == 'subjective') {
+            final rawKeywords = questionMap['keywords'];
+            if (rawKeywords is List) {
+              questionMap['keywords'] = rawKeywords
+                  .map((k) => k.toString().trim().toLowerCase())
+                  .where((k) => k.isNotEmpty)
+                  .toSet()
+                  .toList();
+            } else {
+              questionMap['keywords'] = <String>[];
+            }
+          }
           return questionMap;
         } else {
           return {
@@ -973,6 +998,16 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
     return null;
   }
 
+  List<String> _parseKeywordInput(String raw) {
+    if (raw.trim().isEmpty) return <String>[];
+    return raw
+        .split(RegExp(r'[,;\n]+'))
+        .map((k) => k.trim().toLowerCase())
+        .where((k) => k.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
   void _addMCQQuestion() {
     setState(() {
       questions.add({
@@ -991,6 +1026,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
         'question': '',
         'marks': 1,
         'expectedAnswer': '',
+        'keywords': <String>[],
       });
     });
   }
@@ -1349,6 +1385,23 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                               initialValue: (q['expectedAnswer'] ?? '').toString(),
                               maxLines: 3,
                               onChanged: (value) => questions[qIndex]['expectedAnswer'] = value,
+                            ),
+                            SizedBox(height: 12),
+                            TextFormField(
+                              decoration: InputDecoration(
+                                labelText: 'Keywords for auto-grading',
+                                hintText: 'e.g. tcp, three way handshake, sequence number',
+                                border: OutlineInputBorder(),
+                                helperText: 'Comma, semicolon, or newline separated',
+                              ),
+                              initialValue: ((q['keywords'] as List?) ?? const <dynamic>[])
+                                  .map((k) => k.toString())
+                                  .where((k) => k.trim().isNotEmpty)
+                                  .join(', '),
+                              maxLines: 3,
+                              onChanged: (value) {
+                                questions[qIndex]['keywords'] = _parseKeywordInput(value);
+                              },
                             ),
                           ] else ...[
                             // Coding Question rendering (summary view)

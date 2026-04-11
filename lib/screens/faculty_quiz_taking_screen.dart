@@ -138,6 +138,40 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
     return h;
   }
 
+  List<String> _extractQuestionKeywords(Map<String, dynamic> question) {
+    final raw = question['keywords'];
+    if (raw is List) {
+      return raw
+          .map((k) => k.toString().trim().toLowerCase())
+          .where((k) => k.isNotEmpty)
+          .toSet()
+          .toList();
+    }
+    if (raw is String) {
+      return raw
+          .split(RegExp(r'[,;\n]+'))
+          .map((k) => k.trim().toLowerCase())
+          .where((k) => k.isNotEmpty)
+          .toSet()
+          .toList();
+    }
+    return <String>[];
+  }
+
+  List<String> _matchKeywordsInAnswer(String answer, List<String> keywords) {
+    final normalizedAnswer = answer.toLowerCase();
+    final matched = <String>[];
+    for (final keyword in keywords) {
+      final escaped = RegExp.escape(keyword.trim());
+      if (escaped.isEmpty) continue;
+      final pattern = RegExp(r'(^|[^a-z0-9])' + escaped + r'([^a-z0-9]|$)', caseSensitive: false);
+      if (pattern.hasMatch(normalizedAnswer)) {
+        matched.add(keyword);
+      }
+    }
+    return matched;
+  }
+
   Future<void> _checkExistingSubmission() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -335,6 +369,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
     int codingTestCasesTotal = 0;
     final codingTestCasesPassedByQuestion = List<int>.filled(questions.length, 0);
     final codingTestCasesTotalByQuestion = List<int>.filled(questions.length, 0);
+    final subjectiveKeywordScoreByQuestion = List<double>.filled(questions.length, 0.0);
+    final subjectiveMatchedKeywordsByQuestion = List<List<String>>.generate(questions.length, (_) => <String>[]);
+    final subjectiveTotalKeywordsByQuestion = List<int>.filled(questions.length, 0);
     List<int?> userAnswers = [];
     
     // Calculate results and prepare user answers array
@@ -381,8 +418,24 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
           if (testCases.isNotEmpty) codingTestCasesTotal += testCases.length;
         }
       } else if (type == 'subjective') {
-        // Subjective questions are captured but not auto-graded here.
         userAnswers.add(null);
+        final answerText = (subjectiveAnswers[i] ?? '').trim();
+        final keywords = _extractQuestionKeywords(q);
+        subjectiveTotalKeywordsByQuestion[i] = keywords.length;
+
+        if (answerText.isNotEmpty && keywords.isNotEmpty) {
+          final matched = _matchKeywordsInAnswer(answerText, keywords);
+          subjectiveMatchedKeywordsByQuestion[i] = matched;
+          final earned = (matched.length / keywords.length) * maxMarks;
+          subjectiveKeywordScoreByQuestion[i] = earned;
+          score += earned;
+
+          if (matched.length == keywords.length) {
+            marksFromCorrect += maxMarks;
+          } else if (matched.isNotEmpty) {
+            marksFromPartial += earned;
+          }
+        }
       } else {
         int? selectedAnswer = selectedAnswers[i];
         userAnswers.add(selectedAnswer);
@@ -548,6 +601,10 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
         (i) => (codingLanguages[i] ?? ProgrammingLanguage.python).name,
       );
       final subjectiveAnswersList = List.generate(questions.length, (i) => subjectiveAnswers[i] ?? '');
+      final subjectiveMatchedKeywordsMap = <String, List<String>>{};
+      for (int i = 0; i < subjectiveMatchedKeywordsByQuestion.length; i++) {
+        subjectiveMatchedKeywordsMap[i.toString()] = List<String>.from(subjectiveMatchedKeywordsByQuestion[i]);
+      }
 
       final submission = {
         'quizId': widget.quiz['id'] ?? widget.quiz['key'] ?? '',
@@ -573,6 +630,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
         'codingTestCasesTotal': codingTestCasesTotal,
         'codingTestCasesPassedByQuestion': codingTestCasesPassedByQuestion,
         'codingTestCasesTotalByQuestion': codingTestCasesTotalByQuestion,
+        'subjectiveKeywordScoreByQuestion': subjectiveKeywordScoreByQuestion,
+        'subjectiveMatchedKeywordsByQuestion': subjectiveMatchedKeywordsMap,
+        'subjectiveTotalKeywordsByQuestion': subjectiveTotalKeywordsByQuestion,
         'timeTakenSeconds': timeTaken.inSeconds,
         'completionReason': completionReason,
         'autoTerminated': autoTerminated,

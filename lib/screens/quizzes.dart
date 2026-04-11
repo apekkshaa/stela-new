@@ -761,6 +761,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
   int current = 0;
   Map<int, int> answers = {};
   Map<int, String> codingAnswers = {};
+  Map<int, String> subjectiveAnswers = {};
   Map<int, ProgrammingLanguage> codingLanguages = {};
   Duration remaining = Duration(minutes: 5);
   Timer? _timer;
@@ -901,6 +902,11 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
 
   double score = 0;
   double totalMarks = 0;
+    final Map<int, int> codingPassedByQuestion = {};
+    final Map<int, int> codingTotalByQuestion = {};
+    final Map<int, double> subjectiveKeywordScoreByQuestion = {};
+    final Map<int, List<String>> subjectiveMatchedKeywordsByQuestion = {};
+    final Map<int, int> subjectiveTotalKeywordsByQuestion = {};
     
     // Process each question
     for (int i = 0; i < _mcqs.length; i++) {
@@ -928,13 +934,31 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
           int passed = results.where((r) => r.isPassed).length;
           double questionScore = passed / testCases.length;
           score += questionScore * maxMarks;
+          codingPassedByQuestion[i] = passed;
+          codingTotalByQuestion[i] = testCases.length;
           
           print('Coding Q${i+1} Score: ${questionScore * maxMarks} / $maxMarks ($passed/${testCases.length} passed)');
+        }
+      } else if (_isSubjectiveQuestion(q)) {
+        final answerText = (subjectiveAnswers[i] ?? '').trim();
+        final keywords = _extractQuestionKeywords(q);
+        subjectiveTotalKeywordsByQuestion[i] = keywords.length;
+
+        if (answerText.isNotEmpty && keywords.isNotEmpty) {
+          final matched = _matchKeywordsInAnswer(answerText, keywords);
+          final ratio = matched.length / keywords.length;
+          final questionScore = ratio * maxMarks;
+          score += questionScore;
+          subjectiveKeywordScoreByQuestion[i] = questionScore;
+          subjectiveMatchedKeywordsByQuestion[i] = matched;
+        } else {
+          subjectiveKeywordScoreByQuestion[i] = 0.0;
+          subjectiveMatchedKeywordsByQuestion[i] = <String>[];
         }
       } else {
         // Evaluate MCQ
         if (answers[i] == q['correct']) {
-          score += 1.0;
+          score += maxMarks;
         }
       }
     }
@@ -955,6 +979,12 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
           answers: answers,
           codingAnswers: codingAnswers,
           codingLanguages: codingLanguages,
+          subjectiveAnswers: subjectiveAnswers,
+          codingPassedByQuestion: codingPassedByQuestion,
+          codingTotalByQuestion: codingTotalByQuestion,
+          subjectiveKeywordScoreByQuestion: subjectiveKeywordScoreByQuestion,
+          subjectiveMatchedKeywordsByQuestion: subjectiveMatchedKeywordsByQuestion,
+          subjectiveTotalKeywordsByQuestion: subjectiveTotalKeywordsByQuestion,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
@@ -995,14 +1025,52 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
     return isCoding;
   }
 
+  bool _isSubjectiveQuestion(Map<String, dynamic> question) {
+    return question['type'] == 'subjective';
+  }
+
   double _questionMaxMarks(Map<String, dynamic> question) {
-    if (_isCodingQuestion(question)) {
+    if (_isCodingQuestion(question) || _isSubjectiveQuestion(question)) {
       final v = question['marks'];
       if (v is int) return v.toDouble();
       if (v is double) return v;
       if (v is String) return double.tryParse(v) ?? 1.0;
     }
     return 1.0;
+  }
+
+  List<String> _extractQuestionKeywords(Map<String, dynamic> question) {
+    final raw = question['keywords'];
+    if (raw is List) {
+      return raw
+          .map((k) => k.toString().trim().toLowerCase())
+          .where((k) => k.isNotEmpty)
+          .toSet()
+          .toList();
+    }
+    if (raw is String) {
+      return raw
+          .split(RegExp(r'[,;\n]+'))
+          .map((k) => k.trim().toLowerCase())
+          .where((k) => k.isNotEmpty)
+          .toSet()
+          .toList();
+    }
+    return <String>[];
+  }
+
+  List<String> _matchKeywordsInAnswer(String answer, List<String> keywords) {
+    final normalizedAnswer = answer.toLowerCase();
+    final matched = <String>[];
+    for (final keyword in keywords) {
+      final escaped = RegExp.escape(keyword.trim());
+      if (escaped.isEmpty) continue;
+      final pattern = RegExp('(^|[^a-z0-9])$escaped([^a-z0-9]|\$)', caseSensitive: false);
+      if (pattern.hasMatch(normalizedAnswer)) {
+        matched.add(keyword);
+      }
+    }
+    return matched;
   }
 
   String _fmt(Duration d) => '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}:${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
@@ -1054,7 +1122,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
   /// Check if current question can be answered and user can continue
   bool _canContinue() {
     final q = _mcqs[current];
-    if (_isCodingQuestion(q)) {
+    if (_isCodingQuestion(q) || _isSubjectiveQuestion(q)) {
       // For coding questions: always allow moving to the next question
       // (student can skip without writing code)
       return true;
@@ -1234,24 +1302,44 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _isCodingQuestion(q) ? Colors.purple.shade100 : Colors.blue.shade100,
+                        color: _isCodingQuestion(q)
+                            ? Colors.purple.shade100
+                            : _isSubjectiveQuestion(q)
+                                ? Colors.orange.shade100
+                                : Colors.blue.shade100,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _isCodingQuestion(q) ? Icons.code : Icons.quiz,
+                            _isCodingQuestion(q)
+                                ? Icons.code
+                                : _isSubjectiveQuestion(q)
+                                    ? Icons.subject
+                                    : Icons.quiz,
                             size: 16,
-                            color: _isCodingQuestion(q) ? Colors.purple.shade700 : Colors.blue.shade700,
+                            color: _isCodingQuestion(q)
+                                ? Colors.purple.shade700
+                                : _isSubjectiveQuestion(q)
+                                    ? Colors.orange.shade700
+                                    : Colors.blue.shade700,
                           ),
                           SizedBox(width: 6),
                           Text(
-                            _isCodingQuestion(q) ? 'Coding Question' : 'Multiple Choice',
+                            _isCodingQuestion(q)
+                                ? 'Coding Question'
+                                : _isSubjectiveQuestion(q)
+                                    ? 'Subjective Question'
+                                    : 'Multiple Choice',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: _isCodingQuestion(q) ? Colors.purple.shade700 : Colors.blue.shade700,
+                              color: _isCodingQuestion(q)
+                                  ? Colors.purple.shade700
+                                  : _isSubjectiveQuestion(q)
+                                      ? Colors.orange.shade700
+                                      : Colors.blue.shade700,
                             ),
                           ),
                         ],
@@ -1473,6 +1561,49 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                           ],
                         ),
                       ),
+                    ] else if (_isSubjectiveQuestion(q)) ...[
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Write your answer below:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              SizedBox(height: 10),
+                              TextFormField(
+                                key: ValueKey('subjective_answer_$current'),
+                                maxLines: 10,
+                                minLines: 6,
+                                initialValue: subjectiveAnswers[current] ?? '',
+                                onChanged: (value) {
+                                  subjectiveAnswers[current] = value;
+                                },
+                                decoration: InputDecoration(
+                                  hintText: 'Type your explanation here...',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  alignLabelWithHint: true,
+                                ),
+                              ),
+                              SizedBox(height: 12),
+                              Text(
+                                'Note: This question is auto-evaluated using faculty-defined keywords.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ] else ...[
                       Expanded(
                         child: ListView.builder(
@@ -1592,7 +1723,7 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
-                    onPressed: _isCodingQuestion(_mcqs[current])
+                    onPressed: (_isCodingQuestion(_mcqs[current]) || _isSubjectiveQuestion(_mcqs[current]))
                         ? _nextQuestion
                         : (_canContinue() ? _nextQuestion : null),
                     style: ElevatedButton.styleFrom(
@@ -1606,7 +1737,9 @@ class _QuizTakingScreenState extends State<QuizTakingScreen> with TickerProvider
                     ),
                     child: Text(
                       current < _mcqs.length - 1 
-                        ? (_isCodingQuestion(_mcqs[current]) ? 'Skip & Next' : 'Next Question')
+                        ? ((_isCodingQuestion(_mcqs[current]) || _isSubjectiveQuestion(_mcqs[current]))
+                            ? 'Skip & Next'
+                            : 'Next Question')
                         : 'Submit Quiz',
                       style: TextStyle(
                         fontSize: 16,
@@ -1634,6 +1767,12 @@ class QuizResultScreen extends StatefulWidget {
   final Map<int, dynamic> answers;
   final Map<int, String> codingAnswers;
   final Map<int, ProgrammingLanguage> codingLanguages;
+  final Map<int, String> subjectiveAnswers;
+  final Map<int, int> codingPassedByQuestion;
+  final Map<int, int> codingTotalByQuestion;
+  final Map<int, double> subjectiveKeywordScoreByQuestion;
+  final Map<int, List<String>> subjectiveMatchedKeywordsByQuestion;
+  final Map<int, int> subjectiveTotalKeywordsByQuestion;
 
   QuizResultScreen({
     required this.score,
@@ -1643,6 +1782,12 @@ class QuizResultScreen extends StatefulWidget {
     required this.answers,
     required this.codingAnswers,
     this.codingLanguages = const {},
+    this.subjectiveAnswers = const {},
+    this.codingPassedByQuestion = const {},
+    this.codingTotalByQuestion = const {},
+    this.subjectiveKeywordScoreByQuestion = const {},
+    this.subjectiveMatchedKeywordsByQuestion = const {},
+    this.subjectiveTotalKeywordsByQuestion = const {},
     this.quizColor = Colors.blue,
     this.quiz,
   });
@@ -1732,10 +1877,20 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
       // Convert maps to lists for storage
       final mcqAnswersList = List.generate(widget.total, (i) => widget.answers[i]);
       final codingAnswersList = List.generate(widget.total, (i) => widget.codingAnswers[i] ?? '');
+      final subjectiveAnswersList = List.generate(widget.total, (i) => widget.subjectiveAnswers[i] ?? '');
       final codingLanguagesList = List.generate(
         widget.total,
         (i) => (widget.codingLanguages[i] ?? ProgrammingLanguage.python).name,
       );
+      final codingPassedList = List.generate(widget.total, (i) => widget.codingPassedByQuestion[i] ?? 0);
+      final codingTotalList = List.generate(widget.total, (i) => widget.codingTotalByQuestion[i] ?? 0);
+      final subjectiveKeywordScoreList = List.generate(widget.total, (i) => widget.subjectiveKeywordScoreByQuestion[i] ?? 0.0);
+      final subjectiveMatchedKeywordsMap = <String, List<String>>{};
+      for (int i = 0; i < widget.total; i++) {
+        subjectiveMatchedKeywordsMap[i.toString()] =
+            List<String>.from(widget.subjectiveMatchedKeywordsByQuestion[i] ?? const <String>[]);
+      }
+      final subjectiveTotalKeywordsList = List.generate(widget.total, (i) => widget.subjectiveTotalKeywordsByQuestion[i] ?? 0);
 
       final submission = {
         'quizId': quizId,
@@ -1749,6 +1904,12 @@ class _QuizResultScreenState extends State<QuizResultScreen> with TickerProvider
         'answers': mcqAnswersList,
         'codingAnswers': codingAnswersList,
         'codingLanguages': codingLanguagesList,
+        'subjectiveAnswers': subjectiveAnswersList,
+        'codingTestCasesPassedByQuestion': codingPassedList,
+        'codingTestCasesTotalByQuestion': codingTotalList,
+        'subjectiveKeywordScoreByQuestion': subjectiveKeywordScoreList,
+        'subjectiveMatchedKeywordsByQuestion': subjectiveMatchedKeywordsMap,
+        'subjectiveTotalKeywordsByQuestion': subjectiveTotalKeywordsList,
         'correctAnswers': widget.score,
         'percentage': percentage,
         'totalMarks': widget.totalMarks,
