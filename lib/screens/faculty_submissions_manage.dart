@@ -21,16 +21,30 @@ class _FacultySubmissionsManageState extends State<FacultySubmissionsManage> {
   bool _looksMaskedEnrollment(String value) {
     final v = value.trim();
     if (v.isEmpty) return false;
-    // Ignore placeholders like XXXXXXXX or ****** so export can fall back to real sources.
-    return RegExp(r'^[Xx*#-]{4,}$').hasMatch(v);
+    // Ignore placeholders like XXXXXXXX, XX XX XX, ******, ###, etc.
+    // Some historical data includes separators or unicode multiply sign.
+    final compact = v.replaceAll(RegExp(r'\s+'), '');
+    if (compact.length < 4) return false;
+    if (RegExp(r'^[Xx*#\-_.×]+$').hasMatch(compact)) return true;
+
+    // Treat values that are mostly masking characters and have no digits as masked.
+    final hasDigit = RegExp(r'\d').hasMatch(compact);
+    final hasMaskChars = RegExp(r'[Xx*#×]').hasMatch(compact);
+    final alphaNum = RegExp(r'[A-Za-z0-9]').allMatches(compact).length;
+    final maskish = RegExp(r'[Xx*#\-_.×]').allMatches(compact).length;
+    return !hasDigit && hasMaskChars && maskish >= alphaNum;
   }
 
   String _extractEnrollmentFromData(Map<String, dynamic> data) {
     final candidates = [
       data['enrollmentNumber'],
       data['enrollmentNo'],
+      data['enrollment'],
       data['studentEnrollment'],
       data['studentEnrollmentNumber'],
+      data['student_enrollment'],
+      data['rollNo'],
+      data['rollNumber'],
     ];
     for (final c in candidates) {
       final s = (c ?? '').toString().trim();

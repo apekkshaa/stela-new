@@ -492,11 +492,13 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
       final user = FirebaseAuth.instance.currentUser;
       final studentId = user?.uid ?? '';
       String studentName = '';
+      String studentEnrollment = '';
       if (studentId.isNotEmpty) {
         final studentDoc = await FirebaseFirestore.instance.collection('students').doc(studentId).get();
         if (studentDoc.exists) {
           final data = studentDoc.data();
           studentName = data?['name'] ?? '';
+          studentEnrollment = (data?['enrollmentNumber'] ?? data?['enrollmentNo'] ?? data?['enrollment'] ?? '').toString();
         }
       }
 
@@ -617,6 +619,8 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
         'facultyName': facultyName,
         'studentId': studentId,
         'studentName': studentName,
+        'enrollmentNumber': studentEnrollment,
+        'enrollmentNo': studentEnrollment,
         'answers': userAnswers,
         'codingAnswers': codingAnswersList,
         'codingLanguages': codingLanguagesList,
