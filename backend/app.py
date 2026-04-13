@@ -30,6 +30,15 @@ _rate_limit_lock = threading.Lock()
 _rate_limit_buckets = defaultdict(deque)
 
 
+@app.route('/', methods=['GET'])
+def health():
+    return jsonify({
+        'status': 'ok',
+        'service': 'stela-exec-backend',
+        'executeEndpoint': '/execute',
+    }), 200
+
+
 @app.route('/dashboard', methods=['POST'])
 def dashboard():
     data = request.json
