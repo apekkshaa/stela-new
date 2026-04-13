@@ -7,7 +7,10 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8080 \
-    CODE_EXEC_TIMEOUT_SECONDS=8
+  CODE_EXEC_TIMEOUT_SECONDS=8 \
+  MAX_CONCURRENT_EXECUTIONS=6 \
+  RATE_LIMIT_MAX_REQUESTS=20 \
+  RATE_LIMIT_WINDOW_SECONDS=60
 
 # System deps for multi-language execution
 # - nodejs: JavaScript
@@ -33,5 +36,5 @@ COPY . .
 
 EXPOSE 8080
 
-# Use gunicorn for production-like hosting.
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8080", "app:app"]
+# Threaded workers improve throughput for request-bound execution flows.
+CMD ["gunicorn", "-w", "2", "--threads", "4", "-k", "gthread", "-b", "0.0.0.0:8080", "--timeout", "30", "app:app"]

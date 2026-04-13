@@ -756,7 +756,7 @@ Container(
                   onPressed: () async {
                     // Execute the code
                     final String serverUrl =
-                        'https://stela5.pythonanywhere.com/execute';
+                        const String.fromEnvironment('CODE_EXEC_ENDPOINT', defaultValue: 'http://localhost:8080/execute');
                     final String program = generateProgram();
                     final Map<String, dynamic> requestData = {
                       'code': program,
@@ -799,7 +799,7 @@ Container(
     
       // Execute the code
      /* final String serverUrl =
-          'https://stela5.pythonanywhere.com/execute';
+          const String.fromEnvironment('CODE_EXEC_ENDPOINT', defaultValue: 'http://localhost:8080/execute');
       final String program = generateProgram();
       final Map<String, dynamic> requestData = {
         'code': program,

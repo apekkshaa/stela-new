@@ -5,11 +5,29 @@ from flask_cors import CORS
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
+import threading
+import time
+from collections import defaultdict, deque
 from typing import Tuple
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+# Hard limits to protect free-tier deployments from request bursts and large payloads.
+MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", "200000"))
+MAX_SOURCE_CHARS = int(os.environ.get("MAX_SOURCE_CHARS", "50000"))
+MAX_STDIN_CHARS = int(os.environ.get("MAX_STDIN_CHARS", "20000"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))
+RATE_LIMIT_MAX_REQUESTS = int(os.environ.get("RATE_LIMIT_MAX_REQUESTS", "20"))
+MAX_CONCURRENT_EXECUTIONS = int(os.environ.get("MAX_CONCURRENT_EXECUTIONS", "6"))
+
+app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
+
+_execution_slots = threading.BoundedSemaphore(max(1, MAX_CONCURRENT_EXECUTIONS))
+_rate_limit_lock = threading.Lock()
+_rate_limit_buckets = defaultdict(deque)
 
 
 @app.route('/dashboard', methods=['POST'])
@@ -46,6 +64,36 @@ def _run(cmd, cwd: str, stdin: str, timeout_s: int) -> Tuple[int, str, str]:
     return proc.returncode, proc.stdout.decode("utf-8", errors="replace"), proc.stderr.decode("utf-8", errors="replace")
 
 
+def _client_ip() -> str:
+    xff = (request.headers.get("X-Forwarded-For") or "").strip()
+    if xff:
+        return xff.split(",")[0].strip()
+    return (request.remote_addr or "unknown").strip()
+
+
+def _check_rate_limit(ip: str) -> Tuple[bool, int]:
+    now = time.time()
+    window_start = now - RATE_LIMIT_WINDOW_SECONDS
+    with _rate_limit_lock:
+        bucket = _rate_limit_buckets[ip]
+        while bucket and bucket[0] < window_start:
+            bucket.popleft()
+
+        if len(bucket) >= RATE_LIMIT_MAX_REQUESTS:
+            retry_after = max(1, int(bucket[0] + RATE_LIMIT_WINDOW_SECONDS - now))
+            return False, retry_after
+
+        bucket.append(now)
+
+        # Periodic cleanup to avoid unbounded memory growth.
+        if len(_rate_limit_buckets) > 5000:
+            stale_ips = [k for k, q in _rate_limit_buckets.items() if not q or q[-1] < window_start]
+            for k in stale_ips:
+                _rate_limit_buckets.pop(k, None)
+
+    return True, 0
+
+
 @app.route('/execute', methods=['POST'])
 def execute():
     """Execute code in a given language and return captured stdout.
@@ -54,15 +102,46 @@ def execute():
     This is NOT a secure sandbox. Do not expose this endpoint publicly without containerization,
     strict resource limits, filesystem isolation, and network restrictions.
     """
+    ip = _client_ip()
+    allowed, retry_after = _check_rate_limit(ip)
+    if not allowed:
+        return jsonify({
+            'result': '',
+            'stdout': '',
+            'stderr': 'Rate limit exceeded',
+            'error': 'Rate limit exceeded',
+            'retryAfterSeconds': retry_after,
+            'exitCode': 429,
+        }), 429
+
+    if not _execution_slots.acquire(blocking=False):
+        return jsonify({
+            'result': '',
+            'stdout': '',
+            'stderr': 'Server busy. Try again shortly.',
+            'error': 'Server busy. Try again shortly.',
+            'exitCode': 429,
+        }), 429
+
     data = request.get_json(silent=True) or {}
     code = (data.get('code') or '').replace('\r\n', '\n')
     language = (data.get('language') or 'python').lower()
     stdin = (data.get('input') or data.get('stdin') or '').replace('\r\n', '\n')
 
     if not code.strip():
+        _execution_slots.release()
         return jsonify({'result': '', 'stdout': '', 'stderr': 'Empty code', 'error': 'Empty code', 'exitCode': 1}), 400
 
+    if len(code) > MAX_SOURCE_CHARS:
+        _execution_slots.release()
+        return jsonify({'result': '', 'stdout': '', 'stderr': 'Code too large', 'error': 'Code too large', 'exitCode': 413}), 413
+
+    if len(stdin) > MAX_STDIN_CHARS:
+        _execution_slots.release()
+        return jsonify({'result': '', 'stdout': '', 'stderr': 'Input too large', 'error': 'Input too large', 'exitCode': 413}), 413
+
     timeout_s = int(os.environ.get('CODE_EXEC_TIMEOUT_SECONDS', '8'))
+    timeout_s = min(max(timeout_s, 1), 20)
     exe_name = 'main.exe' if os.name == 'nt' else 'main'
 
     with tempfile.TemporaryDirectory(prefix='stela_exec_') as td:
@@ -71,7 +150,7 @@ def execute():
                 file_path = os.path.join(td, 'main.py')
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(code)
-                exit_code, out, err = _run(['python', file_path], cwd=td, stdin=stdin, timeout_s=timeout_s)
+                exit_code, out, err = _run([sys.executable, file_path], cwd=td, stdin=stdin, timeout_s=timeout_s)
 
             elif language in ('javascript', 'js', 'node'):
                 if shutil.which('node') is None:
@@ -148,6 +227,8 @@ def execute():
             return jsonify({'result': '', 'stdout': '', 'stderr': 'Time limit exceeded', 'error': 'Time limit exceeded', 'exitCode': 124}), 200
         except Exception as e:
             return jsonify({'result': '', 'stdout': '', 'stderr': str(e), 'error': str(e), 'exitCode': 1}), 200
+        finally:
+            _execution_slots.release()
 
 if __name__ == '__main__':
     # For local development you can set FLASK_DEBUG=1.

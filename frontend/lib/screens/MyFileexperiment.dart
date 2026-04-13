@@ -116,7 +116,7 @@ class MyFileExperiment extends StatelessWidget {
                           IconButton(
                             icon: Icon(Icons.play_arrow),
                             onPressed: () async {
-                              final String serverUrl = 'https://stela5.pythonanywhere.com/execute';
+                              final String serverUrl = const String.fromEnvironment('CODE_EXEC_ENDPOINT', defaultValue: 'http://localhost:8080/execute');
                               String textFieldText = textController.text;
                               final String data = initialProgram.replaceAll('\\n', '\n');
                               final Map<String, dynamic> requestData = {
@@ -582,7 +582,7 @@ class MyFileExperiment extends StatelessWidget {
                                                             final String serverUrl =
                                   //'http://127.0.0.1:5000/execute';
                                   //'http://127.0.0.1:8080/execute';
-                                  'https://stela5.pythonanywhere.com/execute';
+                                  const String.fromEnvironment('CODE_EXEC_ENDPOINT', defaultValue: 'http://localhost:8080/execute');
                               String textFieldText = textController.text;
                               final String data =
                                   program.replaceAll('\\n', '\n');

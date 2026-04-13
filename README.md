@@ -43,6 +43,12 @@ Create a Web Service from this repo using:
 - Exposed port: `8080`
 - Environment variable:
 	- `CODE_EXEC_TIMEOUT_SECONDS=6`
+	- `MAX_CONCURRENT_EXECUTIONS=6`
+	- `RATE_LIMIT_MAX_REQUESTS=20`
+	- `RATE_LIMIT_WINDOW_SECONDS=60`
+	- `MAX_REQUEST_BYTES=200000`
+	- `MAX_SOURCE_CHARS=50000`
+	- `MAX_STDIN_CHARS=20000`
 
 The backend endpoint will be:
 
