@@ -221,33 +221,18 @@ class _CodeEditorWidgetState extends State<CodeEditorWidget> {
 class SimulatedCodeRunner {
   static String _defaultExecUrl() {
     const fromDefine = String.fromEnvironment('CODE_EXEC_ENDPOINT', defaultValue: '');
-    // If the app is running on localhost (web), prefer the local multi-language backend
-    // even if a legacy Python-only endpoint was provided via dart-define.
-    if (kIsWeb) {
-      final host = Uri.base.host.toLowerCase();
-      final isLocalhost = host == 'localhost' || host == '127.0.0.1';
-      final defined = fromDefine.trim();
-      final definedLooksLikeLegacyPythonOnly = defined.contains('stela5.pythonanywhere.com/execute');
-      if (isLocalhost && definedLooksLikeLegacyPythonOnly) {
-        // Ignore the legacy endpoint on localhost to avoid running non-Python code as Python.
-      } else if (defined.isNotEmpty) {
-        return defined;
-      }
-    } else {
-      if (fromDefine.trim().isNotEmpty) return fromDefine.trim();
-    }
+    if (fromDefine.trim().isNotEmpty) return fromDefine.trim();
 
     // Local dev convenience: if the Flutter app is running on localhost (web),
     // prefer a local backend that supports multiple languages.
     if (kIsWeb) {
       final host = Uri.base.host.toLowerCase();
       if (host == 'localhost' || host == '127.0.0.1') {
-        return 'http://localhost:5000/execute';
+        return 'http://localhost:8080/execute';
       }
     }
 
-    // Fallback: legacy hosted endpoint (may be Python-only depending on deployment).
-    return 'https://stela5.pythonanywhere.com/execute';
+    return '';
   }
 
   static Future<List<TestCaseExecutionResult>> runTests({
@@ -397,39 +382,77 @@ class SimulatedCodeRunner {
     if (stdin.isNotEmpty) {
       payload['input'] = stdin;
     }
+    const maxAttempts = 3;
+    var lastError = 'Execution failed. Please try again.';
 
-    final resp = await http
-        .post(Uri.parse(url), headers: {'Content-Type': 'application/json'}, body: jsonEncode(payload))
-        .timeout(const Duration(seconds: 25));
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final resp = await http
+            .post(Uri.parse(url), headers: {'Content-Type': 'application/json'}, body: jsonEncode(payload))
+            .timeout(const Duration(seconds: 25));
 
-    if (resp.statusCode != 200) {
-      throw Exception('Execution failed (HTTP ${resp.statusCode})');
+        Map<String, dynamic>? decoded;
+        try {
+          final parsed = jsonDecode(resp.body);
+          if (parsed is Map<String, dynamic>) {
+            decoded = parsed;
+          }
+        } catch (_) {
+          // Ignore non-JSON body and fall back to generic messaging.
+        }
+
+        final retryableStatus = resp.statusCode == 429 || resp.statusCode == 502 || resp.statusCode == 503 || resp.statusCode == 504;
+
+        if (retryableStatus && attempt < maxAttempts) {
+          final retryAfter = (decoded?['retryAfterSeconds'] as num?)?.toInt() ?? attempt;
+          await Future.delayed(Duration(seconds: retryAfter.clamp(1, 4)));
+          continue;
+        }
+
+        if (resp.statusCode != 200) {
+          final backendError = (decoded?['error'] ?? decoded?['stderr'] ?? '').toString().trim();
+          if (backendError.isNotEmpty) {
+            throw Exception(backendError);
+          }
+          throw Exception('Execution failed (HTTP ${resp.statusCode})');
+        }
+
+        if (decoded != null) {
+          // Prefer result for compatibility with existing code.
+          final result = decoded['result'] ?? decoded['stdout'];
+          final error = decoded['error'] ?? decoded['stderr'];
+          if (error != null && error.toString().trim().isNotEmpty && (result == null || result.toString().trim().isEmpty)) {
+            throw Exception(error.toString());
+          }
+
+          final resultStr = result?.toString() ?? '';
+          // Some older Python-only endpoints return Python parse errors inside `result`
+          // (and don't populate `error`). If the student selected a non-Python language,
+          // surface a clearer configuration error.
+          if (language != ProgrammingLanguage.python && _looksLikePythonOnlyError(resultStr)) {
+            throw Exception(
+              'Execution endpoint appears to be Python-only. '
+              'Configure CODE_EXEC_ENDPOINT to a multi-language /execute backend.',
+            );
+          }
+
+          return resultStr;
+        }
+
+        return '';
+      } catch (e) {
+        lastError = e.toString();
+        if (attempt < maxAttempts) {
+          await Future.delayed(Duration(milliseconds: 300 * attempt));
+          continue;
+        }
+      }
     }
 
-    final decoded = jsonDecode(resp.body);
-    if (decoded is Map<String, dynamic>) {
-      // Prefer result for compatibility with existing code.
-      final result = decoded['result'] ?? decoded['stdout'];
-      final error = decoded['error'] ?? decoded['stderr'];
-      if (error != null && error.toString().trim().isNotEmpty && (result == null || result.toString().trim().isEmpty)) {
-        throw Exception(error.toString());
-      }
-
-      final resultStr = result?.toString() ?? '';
-      // Some older Python-only endpoints return Python parse errors inside `result`
-      // (and don't populate `error`). If the student selected a non-Python language,
-      // surface a clearer configuration error.
-      if (language != ProgrammingLanguage.python && _looksLikePythonOnlyError(resultStr)) {
-        throw Exception(
-          'Execution endpoint appears to be Python-only. '
-          'Configure CODE_EXEC_ENDPOINT to a multi-language /execute backend.',
-        );
-      }
-
-      return resultStr;
-    }
-
-    return '';
+    throw Exception(
+      'The server is busy right now. Please wait a moment and try again. '
+      'Details: $lastError',
+    );
   }
 
   static String _mapLanguage(ProgrammingLanguage language) {
