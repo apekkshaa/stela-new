@@ -50,7 +50,7 @@ class DefaultFirebaseOptions {
     projectId: 'stela23-f9a52',
     databaseURL: 'https://stela23-f9a52-default-rtdb.asia-southeast1.firebasedatabase.app/',
     authDomain: 'stela23-f9a52.firebaseapp.com',
-    storageBucket: 'stela23-f9a52.appspot.com',
+    storageBucket: 'stela23-f9a52.firebasestorage.app',
     measurementId: 'G-K976TBCJCN',
   );
 
@@ -61,7 +61,7 @@ class DefaultFirebaseOptions {
     projectId: 'stela23-f9a52',
     databaseURL: 'https://stela23-f9a52-default-rtdb.asia-southeast1.firebasedatabase.app/',
     authDomain: 'stela23-f9a52.firebaseapp.com',
-    storageBucket: 'stela23-f9a52.appspot.com',
+    storageBucket: 'stela23-f9a52.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -71,7 +71,7 @@ class DefaultFirebaseOptions {
     projectId: 'stela23-f9a52',
     databaseURL: 'https://stela23-f9a52-default-rtdb.asia-southeast1.firebasedatabase.app/',
     authDomain: 'stela23-f9a52.firebaseapp.com',
-    storageBucket: 'stela23-f9a52.appspot.com',
+    storageBucket: 'stela23-f9a52.firebasestorage.app',
     iosClientId: '396384933688-tuka347ni20hk5viuikncjo2iimtepnc.apps.googleusercontent.com',
     iosBundleId: 'com.example.stelaApp',
   );
@@ -83,7 +83,7 @@ class DefaultFirebaseOptions {
     projectId: 'stela23-f9a52',
     databaseURL: 'https://stela23-f9a52-default-rtdb.asia-southeast1.firebasedatabase.app/',
     authDomain: 'stela23-f9a52.firebaseapp.com',
-    storageBucket: 'stela23-f9a52.appspot.com',
+    storageBucket: 'stela23-f9a52.firebasestorage.app',
     iosClientId: '396384933688-tuka347ni20hk5viuikncjo2iimtepnc.apps.googleusercontent.com',
     iosBundleId: 'com.example.stelaApp',
   );

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as xl;
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 // import 'package:pdf_text/pdf_text.dart'; // Removed: not available
@@ -10,6 +9,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../firebase_options.dart';
 import '../models/quiz_model.dart';
 import '../widgets/coding_question_form.dart';
@@ -381,16 +381,12 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
       
       // Step 1: Read file bytes
       Uint8List bytes;
-      if (kIsWeb) {
-        // On web, use the bytes directly from file picker
-        bytes = result.files.single.bytes!;
-        print('Web: File read successfully, bytes: ${bytes.length}');
-      } else {
-        // On mobile/desktop, read from file path
-        final file = File(result.files.single.path!);
-        bytes = await file.readAsBytes();
-        print('Mobile: File read successfully, bytes: ${bytes.length}');
+      final picked = result.files.single;
+      if (picked.bytes == null) {
+        throw Exception('Could not read the selected file. Please try again.');
       }
+      bytes = picked.bytes!;
+      print('${kIsWeb ? 'Web' : 'Device'}: File read successfully, bytes: ${bytes.length}');
       
       // Step 2: Parse Excel - try the original approach for all platforms
       List<Map<String, dynamic>> questions = [];
@@ -817,6 +813,7 @@ class _FacultyQuizManageState extends State<FacultyQuizManage> {
                                             FilePickerResult? result = await FilePicker.platform.pickFiles(
                                               type: FileType.custom,
                                               allowedExtensions: ['xlsx', 'xls'],
+                                              withData: true,
                                             );
                                             if (result != null) {
                                               await _processExcelFile(result, unitName: unit);
@@ -926,6 +923,167 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
   List<String> availableUnits = [];
   List<Map<String, dynamic>> questions = [];
 
+  Future<void> _pickAndUploadQuestionImage(int qIndex) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please sign in to upload an image.')),
+        );
+        return;
+      }
+
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+        withData: true,
+      );
+      if (result == null) return;
+
+      final picked = result.files.single;
+      if (picked.bytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read the selected image. Please try again.')),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Center(child: CircularProgressIndicator()),
+      );
+
+      final subjectLabel = (subject['label'] ?? 'subject').toString();
+      final safeSubject = subjectLabel.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_');
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final safeName = (picked.name.isNotEmpty ? picked.name : 'image_$ts')
+          .replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_');
+      final storagePath = 'quiz_question_images/${user.uid}/$safeSubject/q${qIndex + 1}_${ts}_$safeName';
+
+      final ext = (picked.extension ?? '').toLowerCase();
+      final contentType = ext == 'png'
+          ? 'image/png'
+          : ext == 'webp'
+              ? 'image/webp'
+              : 'image/jpeg';
+
+      final ref = FirebaseStorage.instance.ref().child(storagePath);
+      await ref.putData(
+        picked.bytes!,
+        SettableMetadata(contentType: contentType),
+      );
+      final url = await ref.getDownloadURL();
+      
+      print('Image uploaded successfully: $url');
+
+      if (mounted) Navigator.pop(context); // close loader
+      setState(() {
+        questions[qIndex]['imageUrl'] = url;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image uploaded successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Image upload error: $e');
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).maybePop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image upload failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadImageQuestionContent(int qIndex) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please sign in to upload an image.')),
+        );
+        return;
+      }
+
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
+        withData: true,
+      );
+      if (result == null) return;
+
+      final picked = result.files.single;
+      if (picked.bytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read the selected image. Please try again.')),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Center(child: CircularProgressIndicator()),
+      );
+
+      final subjectLabel = (subject['label'] ?? 'subject').toString();
+      final safeSubject = subjectLabel.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_');
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final safeName = (picked.name.isNotEmpty ? picked.name : 'image_$ts')
+          .replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_');
+      final storagePath = 'quiz_question_images/${user.uid}/$safeSubject/img_q${qIndex + 1}_${ts}_$safeName';
+
+      final ext = (picked.extension ?? '').toLowerCase();
+      final contentType = ext == 'png'
+          ? 'image/png'
+          : ext == 'webp'
+              ? 'image/webp'
+              : 'image/jpeg';
+
+      final ref = FirebaseStorage.instance.ref().child(storagePath);
+      await ref.putData(
+        picked.bytes!,
+        SettableMetadata(contentType: contentType),
+      );
+      final url = await ref.getDownloadURL();
+
+      print('Image question content uploaded: $url');
+      if (mounted) Navigator.pop(context); // close loader
+      setState(() {
+        questions[qIndex]['imageQuestionContent'] = url;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Question image uploaded successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Image question content upload error: $e');
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).maybePop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Image upload failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -954,9 +1112,6 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
         final Map<String, dynamic> questionMap = Map<String, dynamic>.from(q as Map);
         final type = (questionMap['type'] ?? '').toString();
 
-        // Image-based questions were removed; strip any old persisted image fields.
-        questionMap.remove('imageUrl');
-
         // Preserve coding and subjective as-is (they already store richer fields).
         if (type == 'coding' || type == 'subjective') {
           if (type == 'subjective') {
@@ -976,6 +1131,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
           return {
             'type': 'mcq',
             'question': questionMap['question']?.toString() ?? '',
+            'imageUrl': questionMap['imageUrl']?.toString(),
             'options': questionMap['options'] is List 
                 ? List<String>.from((questionMap['options'] as List).map((e) => e?.toString() ?? ''))
                 : List<String>.filled(4, ''),
@@ -1013,6 +1169,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
       questions.add({
         'type': 'mcq',
         'question': '',
+        'imageUrl': null,
         'options': List<String>.filled(4, ''),
         'correct': null, // No option pre-selected
       });
@@ -1024,6 +1181,7 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
       questions.add({
         'type': 'subjective',
         'question': '',
+        'imageUrl': null,
         'marks': 1,
         'expectedAnswer': '',
         'keywords': <String>[],
@@ -1044,6 +1202,58 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
         onCancel: () {
           Navigator.pop(context);
         },
+      ),
+    );
+  }
+
+  void _addImageQuestion() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Image Question'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Select answer type for image question:'),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    questions.add({
+                      'type': 'image',
+                      'question': '',
+                      'imageQuestionContent': null,
+                      'imageAnswerType': 'mcq',
+                      'options': List<String>.filled(4, ''),
+                      'correct': null,
+                    });
+                  });
+                },
+                child: Text('Image with MCQ Options'),
+              ),
+              SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    questions.add({
+                      'type': 'image',
+                      'question': '',
+                      'imageQuestionContent': null,
+                      'imageAnswerType': 'subjective',
+                      'marks': 1,
+                      'expectedAnswer': '',
+                      'keywords': <String>[],
+                    });
+                  });
+                },
+                child: Text('Image with Text Answer'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1075,6 +1285,8 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
     for (var q in questions) {
       // MCQ questions need a correct answer selected
       if (q['type'] == 'mcq' && q['correct'] == null) return false;
+      // Image MCQ questions need a correct answer selected
+      if (q['type'] == 'image' && (q['imageAnswerType'] ?? 'subjective').toString() == 'mcq' && q['correct'] == null) return false;
       // Coding questions need at least one test case
       if (q['type'] == 'coding' && (q['testCases'] == null || q['testCases'].isEmpty)) return false;
     }
@@ -1221,24 +1433,28 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                   Color _badgeBg() {
                     if (questionType == 'coding') return Colors.purple.shade100;
                     if (questionType == 'subjective') return Colors.orange.shade100;
+                    if (questionType == 'image') return Colors.teal.shade100;
                     return Colors.blue.shade100;
                   }
 
                   Color _badgeFg() {
                     if (questionType == 'coding') return Colors.purple.shade700;
                     if (questionType == 'subjective') return Colors.orange.shade700;
+                    if (questionType == 'image') return Colors.teal.shade700;
                     return Colors.blue.shade700;
                   }
 
                   IconData _badgeIcon() {
                     if (questionType == 'coding') return Icons.code;
                     if (questionType == 'subjective') return Icons.subject;
+                    if (questionType == 'image') return Icons.image;
                     return Icons.quiz;
                   }
 
                   String _badgeText() {
                     if (questionType == 'coding') return 'Coding Question';
                     if (questionType == 'subjective') return 'Subjective';
+                    if (questionType == 'image') return 'Image Question';
                     return 'MCQ';
                   }
                   
@@ -1302,6 +1518,44 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                               validator: (value) => value == null || value.isEmpty ? "Enter question" : null,
                               onChanged: (value) => questions[qIndex]['question'] = value,
                             ),
+                            SizedBox(height: 10),
+                            Row(
+                              children: [
+                                ElevatedButton.icon(
+                                  icon: Icon(Icons.image),
+                                  label: Text(((questions[qIndex]['imageUrl'] ?? '').toString().isEmpty) ? 'Attach Image' : 'Change Image'),
+                                  onPressed: () => _pickAndUploadQuestionImage(qIndex),
+                                ),
+                                SizedBox(width: 12),
+                                if ((questions[qIndex]['imageUrl'] ?? '').toString().isNotEmpty)
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        questions[qIndex]['imageUrl'] = null;
+                                      });
+                                    },
+                                    child: Text('Remove'),
+                                  ),
+                              ],
+                            ),
+                            if ((questions[qIndex]['imageUrl'] ?? '').toString().isNotEmpty) ...[
+                              SizedBox(height: 10),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  (questions[qIndex]['imageUrl'] ?? '').toString(),
+                                  height: 180,
+                                  width: double.infinity,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stack) => Container(
+                                    height: 80,
+                                    color: Colors.grey.shade200,
+                                    alignment: Alignment.center,
+                                    child: Text('Failed to load image preview'),
+                                  ),
+                                ),
+                              ),
+                            ],
                             SizedBox(height: 12),
                             ...List.generate(4, (optIdx) => Padding(
                                   padding: const EdgeInsets.only(bottom: 8.0),
@@ -1358,6 +1612,44 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                               validator: (value) => value == null || value.isEmpty ? 'Enter question' : null,
                               onChanged: (value) => questions[qIndex]['question'] = value,
                             ),
+                            SizedBox(height: 10),
+                            Row(
+                              children: [
+                                ElevatedButton.icon(
+                                  icon: Icon(Icons.image),
+                                  label: Text(((questions[qIndex]['imageUrl'] ?? '').toString().isEmpty) ? 'Attach Image' : 'Change Image'),
+                                  onPressed: () => _pickAndUploadQuestionImage(qIndex),
+                                ),
+                                SizedBox(width: 12),
+                                if ((questions[qIndex]['imageUrl'] ?? '').toString().isNotEmpty)
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        questions[qIndex]['imageUrl'] = null;
+                                      });
+                                    },
+                                    child: Text('Remove'),
+                                  ),
+                              ],
+                            ),
+                            if ((questions[qIndex]['imageUrl'] ?? '').toString().isNotEmpty) ...[
+                              SizedBox(height: 10),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  (questions[qIndex]['imageUrl'] ?? '').toString(),
+                                  height: 180,
+                                  width: double.infinity,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stack) => Container(
+                                    height: 80,
+                                    color: Colors.grey.shade200,
+                                    alignment: Alignment.center,
+                                    child: Text('Failed to load image preview'),
+                                  ),
+                                ),
+                              ),
+                            ],
                             SizedBox(height: 12),
                             TextFormField(
                               decoration: InputDecoration(
@@ -1403,6 +1695,155 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                                 questions[qIndex]['keywords'] = _parseKeywordInput(value);
                               },
                             ),
+                          ] else if (questionType == 'image') ...[
+                            // Image Question rendering
+                            TextFormField(
+                              decoration: InputDecoration(
+                                labelText: "Question Text",
+                                hintText: 'Describe what to look for in the image',
+                                border: OutlineInputBorder(),
+                              ),
+                              initialValue: q['question'],
+                              validator: (value) => value == null || value.isEmpty ? "Enter question" : null,
+                              onChanged: (value) => questions[qIndex]['question'] = value,
+                            ),
+                            SizedBox(height: 12),
+                            // Image upload for main content
+                            Row(
+                              children: [
+                                ElevatedButton.icon(
+                                  icon: Icon(Icons.image),
+                                  label: Text(((questions[qIndex]['imageQuestionContent'] ?? '').toString().isEmpty) ? 'Upload Question Image' : 'Change Image'),
+                                  onPressed: () => _pickAndUploadImageQuestionContent(qIndex),
+                                ),
+                                SizedBox(width: 12),
+                                if ((questions[qIndex]['imageQuestionContent'] ?? '').toString().isNotEmpty)
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        questions[qIndex]['imageQuestionContent'] = null;
+                                      });
+                                    },
+                                    child: Text('Remove'),
+                                  ),
+                              ],
+                            ),
+                            if ((questions[qIndex]['imageQuestionContent'] ?? '').toString().isNotEmpty) ...[
+                              SizedBox(height: 10),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  (questions[qIndex]['imageQuestionContent'] ?? '').toString(),
+                                  height: 250,
+                                  width: double.infinity,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stack) => Container(
+                                    height: 100,
+                                    color: Colors.grey.shade200,
+                                    alignment: Alignment.center,
+                                    child: Text('Failed to load image preview'),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            SizedBox(height: 12),
+                            Text(
+                              'Answer Type: ${(q['imageAnswerType'] ?? 'subjective').toString().toUpperCase()}',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 12),
+                            if ((q['imageAnswerType'] ?? 'subjective').toString() == 'mcq') ...[
+                              ...List.generate(4, (optIdx) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      children: [
+                                        Radio<int>(
+                                          value: optIdx,
+                                          groupValue: q['correct'],
+                                          onChanged: (val) {
+                                            setState(() {
+                                              questions[qIndex]['correct'] = val;
+                                            });
+                                          },
+                                        ),
+                                        Expanded(
+                                          child: TextFormField(
+                                            decoration: InputDecoration(
+                                              labelText: "Option ${optIdx + 1}",
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            initialValue: q['options'][optIdx],
+                                            validator: (value) => value == null || value.isEmpty ? "Enter option" : null,
+                                            onChanged: (value) => questions[qIndex]['options'][optIdx] = value,
+                                          ),
+                                        ),
+                                        if (q['correct'] == optIdx)
+                                          Container(
+                                            margin: EdgeInsets.only(left: 8),
+                                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text("Correct", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                          ),
+                                      ],
+                                    ),
+                                  )),
+                              if (q['correct'] == null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Text(
+                                    "Please select the correct answer",
+                                    style: TextStyle(color: Colors.red, fontSize: 12),
+                                  ),
+                                ),
+                            ] else ...[
+                              TextFormField(
+                                decoration: InputDecoration(
+                                  labelText: 'Marks',
+                                  hintText: 'e.g., 2, 5, 10',
+                                  border: OutlineInputBorder(),
+                                ),
+                                keyboardType: TextInputType.number,
+                                initialValue: (q['marks'] ?? 1).toString(),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) return 'Required';
+                                  final parsed = int.tryParse(value.trim());
+                                  if (parsed == null) return 'Invalid number';
+                                  if (parsed <= 0) return 'Marks must be > 0';
+                                  return null;
+                                },
+                                onChanged: (value) => questions[qIndex]['marks'] = int.tryParse(value.trim()) ?? (q['marks'] ?? 1),
+                              ),
+                              SizedBox(height: 12),
+                              TextFormField(
+                                decoration: InputDecoration(
+                                  labelText: 'Expected Answer (optional)',
+                                  border: OutlineInputBorder(),
+                                ),
+                                initialValue: (q['expectedAnswer'] ?? '').toString(),
+                                maxLines: 3,
+                                onChanged: (value) => questions[qIndex]['expectedAnswer'] = value,
+                              ),
+                              SizedBox(height: 12),
+                              TextFormField(
+                                decoration: InputDecoration(
+                                  labelText: 'Keywords for auto-grading',
+                                  hintText: 'e.g. mitochondria, nucleus, dna',
+                                  border: OutlineInputBorder(),
+                                  helperText: 'Comma, semicolon, or newline separated',
+                                ),
+                                initialValue: ((q['keywords'] as List?) ?? const <dynamic>[])
+                                    .map((k) => k.toString())
+                                    .where((k) => k.trim().isNotEmpty)
+                                    .join(', '),
+                                maxLines: 3,
+                                onChanged: (value) {
+                                  questions[qIndex]['keywords'] = _parseKeywordInput(value);
+                                },
+                              ),
+                            ],
                           ] else ...[
                             // Coding Question rendering (summary view)
                             Container(
@@ -1512,6 +1953,16 @@ class _QuizCreationFormState extends State<QuizCreationForm> {
                         foregroundColor: Colors.white,
                       ),
                       onPressed: _addSubjectiveQuestion,
+                    ),
+                    SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      icon: Icon(Icons.image),
+                      label: Text('Add Image Question'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _addImageQuestion,
                     ),
                   ],
                 ),

@@ -96,8 +96,13 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
       final q = Map<String, dynamic>.from(questions[i]);
       final type = (q['type'] ?? '').toString();
 
-      // Only MCQs have options/correct indexes to shuffle.
+      // Only MCQs and image MCQs have options/correct indexes to shuffle.
       if (type == 'coding' || type == 'subjective') {
+        questions[i] = q;
+        continue;
+      }
+      
+      if (type == 'image' && (q['imageAnswerType'] ?? 'subjective').toString() != 'mcq') {
         questions[i] = q;
         continue;
       }
@@ -263,7 +268,10 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
   void _syncSubjectiveControllerIfNeeded() {
     final q = questions.isNotEmpty ? questions[currentQuestionIndex] : null;
     final type = (q?['type'] ?? '').toString();
-    if (type != 'subjective') return;
+    if (type != 'subjective' && type != 'image') return;
+    
+    // For image questions, only sync if answer type is subjective
+    if (type == 'image' && (q?['imageAnswerType'] ?? 'subjective').toString() != 'subjective') return;
 
     if (_subjectiveControllerIndex == currentQuestionIndex) return;
     _subjectiveControllerIndex = currentQuestionIndex;
@@ -434,6 +442,41 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
             marksFromCorrect += maxMarks;
           } else if (matched.isNotEmpty) {
             marksFromPartial += earned;
+          }
+        }
+      } else if (type == 'image') {
+        // Image questions can be MCQ or subjective type
+        final imageAnswerType = (q['imageAnswerType'] ?? 'subjective').toString();
+        
+        if (imageAnswerType == 'mcq') {
+          // Treat as MCQ for grading
+          int? selectedAnswer = selectedAnswers[i];
+          userAnswers.add(selectedAnswer);
+          
+          int correctAnswer = q['correct'] ?? 0;
+          if (selectedAnswer != null && selectedAnswer == correctAnswer) {
+            score += maxMarks;
+            marksFromCorrect += maxMarks;
+          }
+        } else {
+          // Treat as subjective for grading
+          userAnswers.add(null);
+          final answerText = (subjectiveAnswers[i] ?? '').trim();
+          final keywords = _extractQuestionKeywords(q);
+          subjectiveTotalKeywordsByQuestion[i] = keywords.length;
+
+          if (answerText.isNotEmpty && keywords.isNotEmpty) {
+            final matched = _matchKeywordsInAnswer(answerText, keywords);
+            subjectiveMatchedKeywordsByQuestion[i] = matched;
+            final earned = (matched.length / keywords.length) * maxMarks;
+            subjectiveKeywordScoreByQuestion[i] = earned;
+            score += earned;
+
+            if (matched.length == keywords.length) {
+              marksFromCorrect += maxMarks;
+            } else if (matched.isNotEmpty) {
+              marksFromPartial += earned;
+            }
           }
         }
       } else {
@@ -744,7 +787,7 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
 
   double _questionMaxMarks(Map<String, dynamic> question) {
     final type = (question['type'] ?? '').toString();
-    if (type == 'coding' || type == 'subjective' || type == 'mcq' || type.isEmpty) {
+    if (type == 'coding' || type == 'subjective' || type == 'image' || type == 'mcq' || type.isEmpty) {
       final v = question['marks'];
       if (v is int) return v.toDouble();
       if (v is double) return v;
@@ -888,7 +931,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
                                 ? Colors.purple.shade100
                                 : questionType == 'subjective'
                                     ? Colors.teal.shade100
-                                    : Colors.blue.shade100,
+                                    : questionType == 'image'
+                                        ? Colors.teal.shade100
+                                        : Colors.blue.shade100,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -899,13 +944,17 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
                                     ? Icons.code
                                     : questionType == 'subjective'
                                         ? Icons.edit_note
-                                        : Icons.quiz,
+                                        : questionType == 'image'
+                                            ? Icons.image
+                                            : Icons.quiz,
                                 size: 16,
                                 color: questionType == 'coding'
                                     ? Colors.purple.shade700
                                     : questionType == 'subjective'
                                         ? Colors.teal.shade700
-                                        : Colors.blue.shade700,
+                                        : questionType == 'image'
+                                            ? Colors.teal.shade700
+                                            : Colors.blue.shade700,
                               ),
                               SizedBox(width: 6),
                               Text(
@@ -913,7 +962,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
                                     ? 'Coding Question'
                                     : questionType == 'subjective'
                                         ? 'Subjective'
-                                        : 'Multiple Choice',
+                                        : questionType == 'image'
+                                            ? 'Image Question'
+                                            : 'Multiple Choice',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -921,7 +972,9 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
                                       ? Colors.purple.shade700
                                       : questionType == 'subjective'
                                           ? Colors.teal.shade700
-                                          : Colors.blue.shade700,
+                                          : questionType == 'image'
+                                              ? Colors.teal.shade700
+                                              : Colors.blue.shade700,
                                 ),
                               ),
                             ],
@@ -955,6 +1008,30 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
                             ),
                           ),
                         ),
+
+                        if ((currentQuestion['imageUrl'] ?? '').toString().isNotEmpty) ...[
+                          SizedBox(height: 12),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              color: Colors.white,
+                              child: Image.network(
+                                (currentQuestion['imageUrl'] ?? '').toString(),
+                                height: 220,
+                                width: double.infinity,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 80,
+                                    alignment: Alignment.center,
+                                    color: Colors.grey[200],
+                                    child: Text('Failed to load image'),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
 
                         SizedBox(height: 20),
 
@@ -1042,6 +1119,125 @@ class _FacultyQuizTakingScreenState extends State<FacultyQuizTakingScreen> with 
                               },
                             ),
                           ),
+                        ] else if (questionType == 'image') ...[
+                          // Image Question rendering
+                          if ((currentQuestion['imageQuestionContent'] ?? '').toString().isNotEmpty) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                color: Colors.white,
+                                child: Image.network(
+                                  (currentQuestion['imageQuestionContent'] ?? '').toString(),
+                                  height: 300,
+                                  width: double.infinity,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      height: 150,
+                                      alignment: Alignment.center,
+                                      color: Colors.grey[200],
+                                      child: Text('Failed to load image'),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 20),
+                          ],
+                          
+                          // Check if it's MCQ or subjective answer type
+                          if ((currentQuestion['imageAnswerType'] ?? 'subjective').toString() == 'mcq') ...[
+                            // MCQ style answers for image question
+                            ...options.asMap().entries.map((entry) {
+                              int index = entry.key;
+                              String option = entry.value;
+                              bool isSelected = selectedAnswers[currentQuestionIndex] == index;
+
+                              return Container(
+                                margin: EdgeInsets.only(bottom: 12),
+                                child: InkWell(
+                                  onTap: () => _selectAnswer(index),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: isSelected 
+                                        ? widget.subject['color'].withOpacity(0.1)
+                                        : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected 
+                                          ? widget.subject['color']
+                                          : Colors.grey[300]!,
+                                        width: isSelected ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: isSelected 
+                                                ? widget.subject['color']
+                                                : Colors.grey[400]!,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: isSelected
+                                            ? Center(
+                                                child: Container(
+                                                  width: 12,
+                                                  height: 12,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: widget.subject['color'],
+                                                  ),
+                                                ),
+                                              )
+                                            : SizedBox(),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            option,
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: primaryBar,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ] else ...[
+                            // Text answer for image question
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: TextField(
+                                controller: _subjectiveController,
+                                maxLines: 6,
+                                decoration: InputDecoration(
+                                  hintText: 'Type your answer based on the image',
+                                  border: InputBorder.none,
+                                ),
+                                onChanged: (value) {
+                                  subjectiveAnswers[currentQuestionIndex] = value;
+                                },
+                              ),
+                            ),
+                          ],
                         ] else ...[
                           // MCQ Options
                           ...options.asMap().entries.map((entry) {

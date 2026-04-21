@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:stela_app/splash.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -13,6 +14,19 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+    // Web-only Firestore config.
+    // Note: this project currently uses a cloud_firestore version where
+    // `experimentalForceLongPolling` is not available on `Settings`.
+    if (kIsWeb) {
+        FirebaseFirestore.instance.settings = const Settings(
+            persistenceEnabled: true,
+        );
+
+        final opts = Firebase.app().options;
+        // Use print() so it reliably appears in Chrome DevTools Console.
+        print('Firebase(web) projectId=${opts.projectId} storageBucket=${opts.storageBucket}');
+    }
 
   CollectionReference pythonCollection =
       FirebaseFirestore.instance.collection("Python");

@@ -177,6 +177,7 @@ class _SubmitAssignmentPageState extends State<SubmitAssignmentPage> {
     _submitWatchdog?.cancel();
     UploadTask? uploadTask;
     var lastActivityAt = DateTime.now();
+    var stallWarned = false;
     void markActivity([String? status]) {
       lastActivityAt = DateTime.now();
       if (!mounted) return;
@@ -195,8 +196,27 @@ class _SubmitAssignmentPageState extends State<SubmitAssignmentPage> {
         return;
       }
       final idleFor = DateTime.now().difference(lastActivityAt);
-      if (idleFor > const Duration(seconds: 45)) {
-        // Attempt to cancel any in-flight upload so we don't keep hanging in the background.
+      // On web, Firebase Storage may retry silently before emitting progress/errors
+      // (permissions/network/proxy). Warn first, but don't cancel too early.
+      if (idleFor > const Duration(seconds: 45) && !stallWarned) {
+        stallWarned = true;
+        lastActivityAt = DateTime.now();
+        setState(() {
+          _submitStatus = 'Still uploading...';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Upload is taking longer than usual. If it keeps waiting, check Chrome DevTools Console/Network for a Firebase Storage error (permission denied/blocked request/offline).',
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 6),
+          ),
+        );
+      }
+
+      // Hard-stop only after a much longer stall; align with the upload timeout below.
+      if (idleFor > const Duration(minutes: 2, seconds: 15)) {
         uploadTask?.cancel();
         setState(() {
           _isSubmitting = false;
@@ -205,7 +225,9 @@ class _SubmitAssignmentPageState extends State<SubmitAssignmentPage> {
         t.cancel();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Submission stalled (no progress for ${idleFor.inSeconds}s). This is usually due to Firebase Storage permissions, offline connectivity, or a blocked request. Please try again and check device logs/console for the exact error.'),
+            content: Text(
+              'Submission stalled (no progress for ${idleFor.inSeconds}s). This is usually due to Firebase Storage permissions, offline connectivity, or a blocked request. Please check the browser console/network logs for the exact error.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -402,7 +424,8 @@ class _SubmitAssignmentPageState extends State<SubmitAssignmentPage> {
       yield _normalizeAssignments(initial);
     } on TimeoutException catch (e) {
       debugPrint('Initial assignments get() timed out: $e');
-      // Keep going to snapshots() (may still succeed later).
+      // Yield something so UI doesn't spin forever; snapshots() may still succeed later.
+      yield const [];
     } on FirebaseException catch (e) {
       debugPrint('Initial assignments get() FirebaseException: code=${e.code} message=${e.message}');
       rethrow;
@@ -412,17 +435,10 @@ class _SubmitAssignmentPageState extends State<SubmitAssignmentPage> {
     }
 
     // 2) Then follow with realtime updates.
-    yield* query
-        .snapshots()
-        .timeout(
-          const Duration(seconds: 25),
-          onTimeout: (sink) => sink.addError(
-            TimeoutException(
-              'Timed out loading assignments. If you are on web, realtime listeners may be blocked by network/firewall. Try switching networks or reload.',
-            ),
-          ),
-        )
-        .map(_normalizeAssignments);
+    // IMPORTANT: don't use Stream.timeout() here.
+    // Firestore only emits when data changes, so a timeout would incorrectly
+    // error out after N seconds even on a healthy connection.
+    yield* query.snapshots().map(_normalizeAssignments);
   }
 
   Widget _buildSubjectPicker() {

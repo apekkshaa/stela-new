@@ -6,6 +6,7 @@ import 'package:stela_app/screens/faculty_subject_manage.dart';
 import 'package:stela_app/screens/faculty_quiz_portal.dart';
 import 'package:stela_app/screens/faculty_assignment_manage.dart';
 import 'package:stela_app/screens/faculty_submissions_manage.dart';
+import 'package:stela_app/screens/faculty_assignment_submissions_manage.dart';
 import 'package:stela_app/screens/faculty_announcements_manage.dart';
 import 'package:stela_app/screens/faculty_progress_manage.dart';
 import 'package:stela_app/screens/faculty_feedback_manage.dart';
@@ -115,6 +116,24 @@ class _FacultyDashboardState extends State<FacultyDashboard> {
         ),
       ),
       "desc": "See student submissions"
+    },
+    {
+      "title": "Assignment Submissions",
+      "icon": Icons.assignment_return,
+      "route": Builder(
+        builder: (context) => FacultyDynamicSubjectPicker(
+          onSubjectTap: (subject) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FacultyAssignmentSubmissionsManage(subject: subject),
+              ),
+            );
+          },
+          title: "Select Subject to View Assignment Submissions",
+        ),
+      ),
+      "desc": "See submitted assignments"
     },
     {
       "title": "Announcements",
