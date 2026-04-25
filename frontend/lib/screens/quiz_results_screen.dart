@@ -133,7 +133,7 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
 
   double _questionMaxMarks(Map<String, dynamic> question) {
     final type = (question['type'] ?? '').toString();
-    if (type == 'coding' || type == 'subjective' || type == 'mcq' || type.isEmpty) {
+    if (type == 'coding' || type == 'subjective' || type == 'image' || type == 'mcq' || type.isEmpty) {
       final v = question['marks'];
       if (v is int) return v.toDouble();
       if (v is double) return v;
@@ -464,7 +464,8 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
     final correctAnswer = question['correct'];
 
     final bool isCoding = type == 'coding';
-    final bool isSubjective = type == 'subjective';
+    final bool isImageMcq = type == 'image' && (question['imageAnswerType'] ?? 'subjective').toString() == 'mcq';
+    final bool isSubjective = type == 'subjective' || (type == 'image' && (question['imageAnswerType'] ?? 'subjective').toString() == 'subjective');
     final double? codingScore = isCoding ? _codingScores[index] : null;
     final double maxMarks = _questionMaxMarks(question);
     final String subjectiveAnswer = isSubjective ? ((widget.subjectiveAnswers[index] ?? '').toString()) : '';
@@ -476,7 +477,7 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
       ? (matchedKeywords.length / subjectiveKeywords.length) * maxMarks
       : 0.0;
 
-    final bool isMcqCorrect = (!isCoding && !isSubjective && userAnswer != null && correctAnswer != null && userAnswer == correctAnswer);
+    final bool isMcqCorrect = ((!isCoding && !isSubjective) || isImageMcq) && userAnswer != null && correctAnswer != null && userAnswer == correctAnswer;
     final double earnedMarks = isCoding
       ? ((codingScore ?? 0.0) * maxMarks)
       : isSubjective
@@ -581,6 +582,28 @@ class _QuizResultsScreenState extends State<QuizResultsScreen> {
               ),
             ),
             SizedBox(height: 12),
+            
+            // Image for image questions
+            if (type == 'image' && (question['imageQuestionContent'] ?? '').toString().isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  (question['imageQuestionContent'] ?? '').toString(),
+                  height: 250,
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 150,
+                      alignment: Alignment.center,
+                      color: Colors.grey[200],
+                      child: Text('Failed to load image'),
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: 12),
+            ],
             
             // Answer details
             if (isCoding) ...[
