@@ -94,6 +94,7 @@ class _TimetableState extends State<Timetable> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: primaryWhite,
       appBar: AppBar(
@@ -114,14 +115,28 @@ class _TimetableState extends State<Timetable> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildStatsDashboard(),
-          _buildViewSelector(),
-          Expanded(
-            child: _buildMainContent(),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              primaryBar.withOpacity(0.08),
+              primaryWhite,
+            ],
           ),
-        ],
+        ),
+        child: Column(
+          children: [
+            _buildHeaderCard(),
+            _buildViewSelector(size),
+            Expanded(
+              child: _buildMainContent(),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddEventDialog(),
@@ -131,25 +146,71 @@ class _TimetableState extends State<Timetable> {
     );
   }
 
-  Widget _buildStatsDashboard() {
+  Widget _buildHeaderCard() {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: primaryBar,
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
         ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            primaryBar.withOpacity(0.95),
+            primaryButton.withOpacity(0.9),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(color: primaryBar.withOpacity(0.25), blurRadius: 16, offset: Offset(0, 8)),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.event_available, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Plan your week, stay on track',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'PTSerif-Bold',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Quick view of your streak and progress',
+                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatCard('🔥 Streak', '$userStreak days', Icons.local_fire_department),
-              _buildStatCard('⭐ XP', '$userXP', Icons.star),
-              _buildStatCard('📊 Progress', '${(weeklyProgress * 100).toInt()}%', Icons.trending_up),
+              _buildStatChip('Streak', '$userStreak days', Icons.local_fire_department),
+              _buildStatChip('XP', '$userXP', Icons.star),
+              _buildStatChip('Progress', '${(weeklyProgress * 100).toInt()}%', Icons.trending_up),
             ],
           ),
           SizedBox(height: 12),
@@ -163,33 +224,46 @@ class _TimetableState extends State<Timetable> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 24),
-        SizedBox(height: 4),
-        Text(
-          title,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 12,
-            fontFamily: 'PTSerif',
+  Widget _buildStatChip(String title, String value, IconData icon) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 18),
+          SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 11,
+                  fontFamily: 'PTSerif',
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontFamily: 'PTSerif-Bold',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontFamily: 'PTSerif-Bold',
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildViewSelector() {
+  Widget _buildViewSelector(Size size) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: SingleChildScrollView(
@@ -204,11 +278,15 @@ class _TimetableState extends State<Timetable> {
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? primaryButton : Colors.transparent,
+                    color: isSelected ? primaryButton : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected ? primaryButton : primaryBar.withOpacity(0.3),
+                      color: isSelected ? primaryButton : primaryBar.withOpacity(0.12),
                     ),
+                    boxShadow: [
+                      if (isSelected)
+                        BoxShadow(color: primaryButton.withOpacity(0.25), blurRadius: 8, offset: Offset(0, 4)),
+                    ],
                   ),
                   child: Text(
                     view,
@@ -268,46 +346,86 @@ class _TimetableState extends State<Timetable> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
+          BoxShadow(color: primaryBar.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4)),
         ],
       ),
-      child: ListTile(
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: event['color'].withOpacity(0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            _getEventIcon(event['type']),
-            color: event['color'],
-          ),
-        ),
-        title: Text(
-          event['title'],
-          style: TextStyle(
-            fontFamily: 'PTSerif-Bold',
-            fontWeight: FontWeight.bold,
-            color: primaryBar,
-          ),
-        ),
-        subtitle: Text(
-          '${event['startTime']} - ${event['endTime']} • ${event['location']}',
-          style: TextStyle(
-            fontFamily: 'PTSerif',
-            color: primaryBar.withOpacity(0.7),
-          ),
+      child: Padding(
+        padding: EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: event['color'].withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _getEventIcon(event['type']),
+                color: event['color'],
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event['title'],
+                    style: TextStyle(
+                      fontFamily: 'PTSerif-Bold',
+                      fontWeight: FontWeight.bold,
+                      color: primaryBar,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    event['description'],
+                    style: TextStyle(
+                      fontFamily: 'PTSerif',
+                      color: primaryBar.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 14, color: primaryBar.withOpacity(0.6)),
+                      SizedBox(width: 4),
+                      Text(
+                        '${event['startTime']} - ${event['endTime']}',
+                        style: TextStyle(fontSize: 12, color: primaryBar.withOpacity(0.7)),
+                      ),
+                      SizedBox(width: 10),
+                      Icon(Icons.location_on, size: 14, color: primaryBar.withOpacity(0.6)),
+                      SizedBox(width: 4),
+                      Text(
+                        event['location'],
+                        style: TextStyle(fontSize: 12, color: primaryBar.withOpacity(0.7)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _buildBadge(event['day'], primaryBar.withOpacity(0.08), primaryBar),
+                SizedBox(height: 8),
+                _buildBadge(event['type'], event['color'].withOpacity(0.15), event['color']),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildDailyView() {
+    final today = _getTodayLabel();
+    final todayEvents = events.where((event) => event['day'] == today).toList();
     return ListView(
       padding: EdgeInsets.all(16),
       children: [
@@ -321,7 +439,10 @@ class _TimetableState extends State<Timetable> {
           ),
         ),
         SizedBox(height: 16),
-        ...events.map((event) => _buildEventCard(event)).toList(),
+        if (todayEvents.isEmpty)
+          _buildEmptyState('No events today', 'Enjoy the free time or plan ahead.')
+        else
+          ...todayEvents.map((event) => _buildEventCard(event)).toList(),
       ],
     );
   }
@@ -340,7 +461,10 @@ class _TimetableState extends State<Timetable> {
           ),
         ),
         SizedBox(height: 16),
-        ...tasks.map((task) => _buildTaskCard(task)).toList(),
+        if (tasks.isEmpty)
+          _buildEmptyState('No tasks right now', 'Add a reminder to stay organized.')
+        else
+          ...tasks.map((task) => _buildTaskCard(task)).toList(),
       ],
     );
   }
@@ -355,11 +479,7 @@ class _TimetableState extends State<Timetable> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
+          BoxShadow(color: primaryBar.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4)),
         ],
       ),
       child: ListTile(
@@ -391,6 +511,7 @@ class _TimetableState extends State<Timetable> {
             color: primaryBar.withOpacity(0.7),
           ),
         ),
+        trailing: _buildBadge(task['priority'], priorityColor.withOpacity(0.15), priorityColor),
       ),
     );
   }
@@ -409,7 +530,10 @@ class _TimetableState extends State<Timetable> {
           ),
         ),
         SizedBox(height: 16),
-        ...notes.map((note) => _buildNoteCard(note)).toList(),
+        if (notes.isEmpty)
+          _buildEmptyState('No notes saved', 'Capture key ideas as you learn.')
+        else
+          ...notes.map((note) => _buildNoteCard(note)).toList(),
       ],
     );
   }
@@ -421,11 +545,7 @@ class _TimetableState extends State<Timetable> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
+          BoxShadow(color: primaryBar.withOpacity(0.05), blurRadius: 10, offset: Offset(0, 4)),
         ],
       ),
       child: ListTile(
@@ -458,8 +578,66 @@ class _TimetableState extends State<Timetable> {
             color: primaryBar.withOpacity(0.7),
           ),
         ),
+        trailing: _buildBadge(note['subject'], primaryButton.withOpacity(0.12), primaryButton),
       ),
     );
+  }
+
+  Widget _buildBadge(String text, Color bgColor, Color fgColor) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 11, color: fgColor, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String title, String subtitle) {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: primaryButton.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(color: primaryBar.withOpacity(0.04), blurRadius: 8, offset: Offset(0, 3)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: primaryButton.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.event_available, color: primaryButton),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontFamily: 'PTSerif-Bold', color: primaryBar)),
+                SizedBox(height: 4),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: primaryBar.withOpacity(0.6))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getTodayLabel() {
+    final now = DateTime.now();
+    final index = (now.weekday - 1).clamp(0, days.length - 1);
+    return days[index];
   }
 
   IconData _getEventIcon(String type) {
