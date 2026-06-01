@@ -18,10 +18,26 @@ flutter run -d chrome \
 
 ### Backend (Flask)
 
+For MacOS: 
+
 ```bash
 cd backend
 pip install -r requirements.txt
 gunicorn -w 2 -b 0.0.0.0:8080 app:app
+```
+
+For Windows (PowerShell):
+
+```powershell
+cd backend
+pip install -r requirements.txt
+
+# Option A: Flask dev server
+python -m flask run --host=0.0.0.0 --port=8080
+
+# Option B: Waitress (production-ready on Windows)
+pip install waitress
+waitress-serve --listen=0.0.0.0:8080 app:app
 ```
 
 ## Deploy Frontend to Vercel
